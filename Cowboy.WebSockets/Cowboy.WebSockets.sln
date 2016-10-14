@@ -1,0 +1,63 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{0E04BEDA-90F9-4E44-91B9-FAE42EF01498}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{D36E264D-BB94-4D14-A292-A852A3D6D5F7}"
+	ProjectSection(SolutionItems) = preProject
+		..\LICENSE = ..\LICENSE
+		..\README.md = ..\README.md
+		SolutionVersion.cs = SolutionVersion.cs
+	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cowboy.WebSockets", "Cowboy.WebSockets\Cowboy.WebSockets.csproj", "{3A79448C-5D23-4325-8076-576E64BA65BE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cowboy.WebSockets.TestAsyncWebSocketClient", "Tests\Cowboy.WebSockets.TestAsyncWebSocketClient\Cowboy.WebSockets.TestAsyncWebSocketClient.csproj", "{95639F67-5297-4D55-B126-2CB9226226CB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cowboy.WebSockets.TestAsyncWebSocketServer", "Tests\Cowboy.WebSockets.TestAsyncWebSocketServer\Cowboy.WebSockets.TestAsyncWebSocketServer.csproj", "{31C790E5-1BB5-4004-82B8-43D1FCAF97C3}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "WebSocket", "WebSocket", "{587FEB1F-1F50-41B0-89CC-B5423ED04842}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cowboy.WebSockets.UnityWebSocketClient", "Cowboy.WebSockets.UnityWebSocketClient\Cowboy.WebSockets.UnityWebSocketClient.csproj", "{671E566B-878A-4642-8011-AA4168773ADF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cowboy.WebSockets.TestUnityWebSocketClient", "Tests\Cowboy.WebSockets.TestUnityWebSocketClient\Cowboy.WebSockets.TestUnityWebSocketClient.csproj", "{D6DB086F-FFE4-461A-89BF-343195E09287}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3A79448C-5D23-4325-8076-576E64BA65BE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3A79448C-5D23-4325-8076-576E64BA65BE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3A79448C-5D23-4325-8076-576E64BA65BE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3A79448C-5D23-4325-8076-576E64BA65BE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{95639F67-5297-4D55-B126-2CB9226226CB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{95639F67-5297-4D55-B126-2CB9226226CB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{95639F67-5297-4D55-B126-2CB9226226CB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{95639F67-5297-4D55-B126-2CB9226226CB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31C790E5-1BB5-4004-82B8-43D1FCAF97C3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31C790E5-1BB5-4004-82B8-43D1FCAF97C3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31C790E5-1BB5-4004-82B8-43D1FCAF97C3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31C790E5-1BB5-4004-82B8-43D1FCAF97C3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{671E566B-878A-4642-8011-AA4168773ADF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{671E566B-878A-4642-8011-AA4168773ADF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{671E566B-878A-4642-8011-AA4168773ADF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{671E566B-878A-4642-8011-AA4168773ADF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D6DB086F-FFE4-461A-89BF-343195E09287}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D6DB086F-FFE4-461A-89BF-343195E09287}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D6DB086F-FFE4-461A-89BF-343195E09287}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D6DB086F-FFE4-461A-89BF-343195E09287}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{95639F67-5297-4D55-B126-2CB9226226CB} = {587FEB1F-1F50-41B0-89CC-B5423ED04842}
+		{31C790E5-1BB5-4004-82B8-43D1FCAF97C3} = {587FEB1F-1F50-41B0-89CC-B5423ED04842}
+		{587FEB1F-1F50-41B0-89CC-B5423ED04842} = {0E04BEDA-90F9-4E44-91B9-FAE42EF01498}
+		{D6DB086F-FFE4-461A-89BF-343195E09287} = {587FEB1F-1F50-41B0-89CC-B5423ED04842}
+	EndGlobalSection
+EndGlobal
