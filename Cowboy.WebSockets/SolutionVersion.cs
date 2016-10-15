@@ -1,7 +1,7 @@
 ﻿using System.Reflection;
 using System.Runtime.InteropServices;
 
-[assembly: AssemblyDescription("Cowboy.WebSockets is a library for building WebSocket based services.")]
+[assembly: AssemblyDescription("Cowboy.WebSockets is a C# based library for building WebSocket services.")]
 [assembly: AssemblyCompany("Dennis Gao")]
 [assembly: AssemblyProduct("Cowboy.WebSockets")]
 [assembly: AssemblyCopyright("Copyright © 2015-2016 Dennis Gao")]
