@@ -650,7 +650,7 @@ namespace Cowboy.WebSockets
                 // A Pong frame sent in response to a Ping frame must have identical
                 // "Application data" as found in the message body of the Ping frame being replied to.
                 var pong = new PongFrame(ping).ToArray(_frameBuilder);
-                SendFrame(pong);
+                BeginSendFrame(pong);
             }
         }
 
@@ -899,6 +899,48 @@ namespace Cowboy.WebSockets
 
             try
             {
+                _stream.Write(frame, 0, frame.Length);
+            }
+            catch (Exception ex)
+            {
+                if (!CloseIfShould(ex))
+                    throw;
+            }
+        }
+
+        public void BeginSendText(string text)
+        {
+            BeginSendFrame(new TextFrame(text).ToArray(_frameBuilder));
+        }
+
+        public void BeginSendBinary(byte[] data)
+        {
+            BeginSendBinary(data, 0, data.Length);
+        }
+
+        public void BeginSendBinary(byte[] data, int offset, int count)
+        {
+            BeginSendFrame(new BinaryFrame(data, offset, count).ToArray(_frameBuilder));
+        }
+
+        public void BeginSendBinary(ArraySegment<byte> segment)
+        {
+            BeginSendFrame(new BinaryFrame(segment).ToArray(_frameBuilder));
+        }
+
+        private void BeginSendFrame(byte[] frame)
+        {
+            if (frame == null)
+            {
+                throw new ArgumentNullException("frame");
+            }
+            if (State != WebSocketState.Open)
+            {
+                throw new InvalidOperationException("This websocket client has not connected to server.");
+            }
+
+            try
+            {
                 _stream.BeginWrite(frame, 0, frame.Length, HandleDataWritten, _stream);
             }
             catch (Exception ex)
@@ -913,6 +955,74 @@ namespace Cowboy.WebSockets
             try
             {
                 _stream.EndWrite(ar);
+                _keepAliveTracker.OnDataSent();
+            }
+            catch (Exception ex)
+            {
+                if (!CloseIfShould(ex))
+                    throw;
+            }
+        }
+
+        public IAsyncResult BeginSendText(string text, AsyncCallback callback, object state)
+        {
+            return BeginSendFrame(new TextFrame(text).ToArray(_frameBuilder), callback, state);
+        }
+
+        public IAsyncResult BeginSendBinary(byte[] data, AsyncCallback callback, object state)
+        {
+            return BeginSendBinary(data, 0, data.Length, callback, state);
+        }
+
+        public IAsyncResult BeginSendBinary(byte[] data, int offset, int count, AsyncCallback callback, object state)
+        {
+            return BeginSendFrame(new BinaryFrame(data, offset, count).ToArray(_frameBuilder), callback, state);
+        }
+
+        public IAsyncResult BeginSendBinary(ArraySegment<byte> segment, AsyncCallback callback, object state)
+        {
+            return BeginSendFrame(new BinaryFrame(segment).ToArray(_frameBuilder), callback, state);
+        }
+
+        private IAsyncResult BeginSendFrame(byte[] frame, AsyncCallback callback, object state)
+        {
+            if (frame == null)
+            {
+                throw new ArgumentNullException("frame");
+            }
+            if (State != WebSocketState.Open)
+            {
+                throw new InvalidOperationException("This websocket client has not connected to server.");
+            }
+
+            try
+            {
+                return _stream.BeginWrite(frame, 0, frame.Length, callback, state);
+            }
+            catch (Exception ex)
+            {
+                if (!CloseIfShould(ex))
+                    throw;
+            }
+
+            return null;
+        }
+
+        public void EndSendText(IAsyncResult asyncResult)
+        {
+            EndSend(asyncResult);
+        }
+
+        public void EndSendBinary(IAsyncResult asyncResult)
+        {
+            EndSend(asyncResult);
+        }
+
+        private void EndSend(IAsyncResult asyncResult)
+        {
+            try
+            {
+                _stream.EndWrite(asyncResult);
                 _keepAliveTracker.OnDataSent();
             }
             catch (Exception ex)
@@ -995,7 +1105,7 @@ namespace Cowboy.WebSockets
                     if (_keepAliveTracker.ShouldSendKeepAlive())
                     {
                         var keepAliveFrame = new PingFrame().ToArray(_frameBuilder);
-                        SendFrame(keepAliveFrame);
+                        BeginSendFrame(keepAliveFrame);
                         StartKeepAliveTimeoutTimer();
 
                         _keepAliveTracker.ResetTimer();

@@ -45,7 +45,7 @@ namespace Cowboy.WebSockets.TestUnityWebSocketClient
                             int count = 10000;
                             for (int i = 1; i <= count; i++)
                             {
-                                _client.SendBinary(Encoding.UTF8.GetBytes(text));
+                                _client.BeginSendBinary(Encoding.UTF8.GetBytes(text));
                                 Console.WriteLine("Client [{0}] send binary -> Sequence[{1}] -> TextLength[{2}].",
                                     _client.LocalEndPoint, i, text.Length);
                             }
@@ -56,12 +56,12 @@ namespace Cowboy.WebSockets.TestUnityWebSocketClient
                         else if (text == "big")
                         {
                             text = new string('x', 1024 * 1024 * 100);
-                            _client.SendBinary(Encoding.UTF8.GetBytes(text));
+                            _client.BeginSendBinary(Encoding.UTF8.GetBytes(text));
                             Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
                         }
                         else
                         {
-                            _client.SendBinary(Encoding.UTF8.GetBytes(text));
+                            _client.BeginSendBinary(Encoding.UTF8.GetBytes(text));
                             Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
 
                             //_client.SendText(text);
