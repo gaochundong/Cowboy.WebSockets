@@ -94,7 +94,8 @@ namespace Cowboy.WebSockets
 
             lock (_sync)
             {
-                _bufferStack.Push(buffer);
+                if (buffer.Length == BufferSize)
+                    _bufferStack.Push(buffer);
             }
         }
 
