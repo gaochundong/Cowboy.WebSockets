@@ -14,7 +14,7 @@ namespace Cowboy.WebSockets
     {
         public AsyncWebSocketClientConfiguration()
         {
-            BufferManager = new GrowingByteBufferManager(4, 8192);
+            BufferManager = new SegmentBufferManager(100, 8192, 1, true);
             ReceiveBufferSize = 8192;
             SendBufferSize = 8192;
             ReceiveTimeout = TimeSpan.Zero;
@@ -48,7 +48,7 @@ namespace Cowboy.WebSockets
             RequestedSubProtocols = new List<WebSocketSubProtocolRequestDescription>();
         }
 
-        public IBufferManager BufferManager { get; set; }
+        public ISegmentBufferManager BufferManager { get; set; }
         public int ReceiveBufferSize { get; set; }
         public int SendBufferSize { get; set; }
         public TimeSpan ReceiveTimeout { get; set; }

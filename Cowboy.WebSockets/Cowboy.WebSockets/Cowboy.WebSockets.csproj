@@ -49,6 +49,11 @@
     <Compile Include="Buffer\BufferValidator.cs" />
     <Compile Include="Buffer\GrowingByteBufferManager.cs" />
     <Compile Include="Buffer\IBufferManager.cs" />
+    <Compile Include="Buffer\ISegmentBufferManager.cs" />
+    <Compile Include="Buffer\SegmentBufferDeflector.cs" />
+    <Compile Include="Buffer\SegmentBufferManager.cs" />
+    <Compile Include="Buffer\UnableToAllocateBufferException.cs" />
+    <Compile Include="Buffer\UnableToCreateMemoryException .cs" />
     <Compile Include="Client\AsyncWebSocketClientConfiguration.cs" />
     <Compile Include="Client\AsyncWebSocketClient.cs" />
     <Compile Include="Extensions\IWebSocketExtensionNegotiator.cs" />

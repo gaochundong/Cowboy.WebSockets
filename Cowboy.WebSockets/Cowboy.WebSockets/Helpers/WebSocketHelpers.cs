@@ -5,7 +5,7 @@ namespace Cowboy.WebSockets
 {
     internal sealed class WebSocketHelpers
     {
-        internal static bool FindHttpMessageTerminator(byte[] buffer, int count, out int index)
+        internal static bool FindHttpMessageTerminator(byte[] buffer, int offset, int count, out int index)
         {
             index = -1;
 
@@ -16,7 +16,7 @@ namespace Cowboy.WebSockets
                     bool matched = true;
                     for (int j = 0; j < Consts.HttpMessageTerminator.Length; j++)
                     {
-                        if (buffer[i + j] != Consts.HttpMessageTerminator[j])
+                        if (buffer[offset + i + j] != Consts.HttpMessageTerminator[j])
                         {
                             matched = false;
                             break;

@@ -61,35 +61,29 @@ namespace Cowboy.WebSockets.TestAsyncWebSocketClient
                                     Console.WriteLine("Client [{0}] send binary -> Count[{1}] -> Cost[{2}] -> PerSecond[{3}].",
                                         _client.LocalEndPoint, count, watch.ElapsedMilliseconds / 1000, count / (watch.ElapsedMilliseconds / 1000));
                                 }
-                                else if (text == "big")
+                                else if (text == "big1")
+                                {
+                                    text = new string('x', 1024 * 1024 * 1);
+                                    await _client.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
+                                    Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
+                                }
+                                else if (text == "big10")
+                                {
+                                    text = new string('x', 1024 * 1024 * 10);
+                                    await _client.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
+                                    Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
+                                }
+                                else if (text == "big100")
                                 {
                                     text = new string('x', 1024 * 1024 * 100);
                                     await _client.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
-                                    Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
+                                    Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
                                 }
-                                else if (text == "8192")
+                                else if (text == "big1000")
                                 {
-                                    text = new string('x', 1024 * 8);
+                                    text = new string('x', 1024 * 1024 * 1000);
                                     await _client.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
-                                    Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
-                                }
-                                else if (text == "4096")
-                                {
-                                    text = new string('x', 1024 * 4);
-                                    await _client.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
-                                    Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
-                                }
-                                else if (text == "2048")
-                                {
-                                    text = new string('x', 1024 * 2);
-                                    await _client.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
-                                    Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
-                                }
-                                else if (text == "1024")
-                                {
-                                    text = new string('x', 1024);
-                                    await _client.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
-                                    Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
+                                    Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
                                 }
                                 else
                                 {
@@ -137,7 +131,14 @@ namespace Cowboy.WebSockets.TestAsyncWebSocketClient
         {
             var text = Encoding.UTF8.GetString(data, offset, count);
             Console.Write(string.Format("WebSocket server [{0}] received Binary --> ", client.RemoteEndPoint));
-            Console.WriteLine(string.Format("{0}", text));
+            if (count < 1024 * 1024 * 1)
+            {
+                Console.WriteLine(text);
+            }
+            else
+            {
+                Console.WriteLine("{0} Bytes", count);
+            }
 
             await Task.CompletedTask;
         }

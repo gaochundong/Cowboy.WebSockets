@@ -53,11 +53,29 @@ namespace Cowboy.WebSockets.TestUnityWebSocketClient
                             Console.WriteLine("Client [{0}] send binary -> Count[{1}] -> Cost[{2}] -> PerSecond[{3}].",
                                 _client.LocalEndPoint, count, watch.ElapsedMilliseconds / 1000, count / (watch.ElapsedMilliseconds / 1000));
                         }
-                        else if (text == "big")
+                        else if (text == "big1")
+                        {
+                            text = new string('x', 1024 * 1024 * 1);
+                            _client.BeginSendBinary(Encoding.UTF8.GetBytes(text));
+                            Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
+                        }
+                        else if (text == "big10")
+                        {
+                            text = new string('x', 1024 * 1024 * 10);
+                            _client.BeginSendBinary(Encoding.UTF8.GetBytes(text));
+                            Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
+                        }
+                        else if (text == "big100")
                         {
                             text = new string('x', 1024 * 1024 * 100);
                             _client.BeginSendBinary(Encoding.UTF8.GetBytes(text));
-                            Console.WriteLine("Client [{0}] send binary -> [{1}].", _client.LocalEndPoint, text);
+                            Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
+                        }
+                        else if (text == "big1000")
+                        {
+                            text = new string('x', 1024 * 1024 * 1000);
+                            _client.BeginSendBinary(Encoding.UTF8.GetBytes(text));
+                            Console.WriteLine("Client [{0}] send binary -> [{1} Bytes].", _client.LocalEndPoint, text.Length);
                         }
                         else
                         {
@@ -105,7 +123,14 @@ namespace Cowboy.WebSockets.TestUnityWebSocketClient
         {
             var text = Encoding.UTF8.GetString(e.Data, e.DataOffset, e.DataLength);
             Console.Write(string.Format("WebSocket server [{0}] received Binary --> ", e.Client.RemoteEndPoint));
-            Console.WriteLine(string.Format("{0}", text));
+            if (e.DataLength < 1024 * 1024 * 1)
+            {
+                Console.WriteLine(text);
+            }
+            else
+            {
+                Console.WriteLine("{0} Bytes", e.DataLength);
+            }
         }
     }
 }

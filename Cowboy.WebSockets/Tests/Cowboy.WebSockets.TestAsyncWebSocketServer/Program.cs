@@ -47,11 +47,29 @@ namespace Cowboy.WebSockets.TestAsyncWebSocketServer
                                     Console.WriteLine("WebSocket server [{0}] broadcasts binary -> [{1}].", _server.ListenedEndPoint, text);
                                 }
                             }
-                            else if (text == "big")
+                            else if (text == "big1")
+                            {
+                                text = new string('x', 1024 * 1024 * 1);
+                                await _server.BroadcastBinaryAsync(Encoding.UTF8.GetBytes(text));
+                                Console.WriteLine("WebSocket server [{0}] broadcasts binary -> [{1} Bytes].", _server.ListenedEndPoint, text.Length);
+                            }
+                            else if (text == "big10")
+                            {
+                                text = new string('x', 1024 * 1024 * 10);
+                                await _server.BroadcastBinaryAsync(Encoding.UTF8.GetBytes(text));
+                                Console.WriteLine("WebSocket server [{0}] broadcasts binary -> [{1} Bytes].", _server.ListenedEndPoint, text.Length);
+                            }
+                            else if (text == "big100")
                             {
                                 text = new string('x', 1024 * 1024 * 100);
                                 await _server.BroadcastBinaryAsync(Encoding.UTF8.GetBytes(text));
-                                Console.WriteLine("WebSocket server [{0}] broadcasts binary -> [{1}].", _server.ListenedEndPoint, text);
+                                Console.WriteLine("WebSocket server [{0}] broadcasts binary -> [{1} Bytes].", _server.ListenedEndPoint, text.Length);
+                            }
+                            else if (text == "big1000")
+                            {
+                                text = new string('x', 1024 * 1024 * 1000);
+                                await _server.BroadcastBinaryAsync(Encoding.UTF8.GetBytes(text));
+                                Console.WriteLine("WebSocket server [{0}] broadcasts binary -> [{1} Bytes].", _server.ListenedEndPoint, text.Length);
                             }
                             else
                             {
