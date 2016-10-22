@@ -22,7 +22,6 @@ namespace Cowboy.WebSockets
         #region Fields
 
         private static readonly ILog _log = Logger.Get<AsyncWebSocketClient>();
-        private IBufferManager _bufferManager;
         private TcpClient _tcpClient;
         private readonly IAsyncWebSocketClientMessageDispatcher _dispatcher;
         private readonly AsyncWebSocketClientConfiguration _configuration;
@@ -69,6 +68,9 @@ namespace Cowboy.WebSockets
             _configuration = configuration ?? new AsyncWebSocketClientConfiguration();
             _sslEnabled = uri.Scheme.ToLowerInvariant() == "wss";
 
+            if (_configuration.BufferManager == null)
+                throw new InvalidProgramException("The buffer manager in configuration cannot be null.");
+
             Initialize();
         }
 
@@ -104,7 +106,6 @@ namespace Cowboy.WebSockets
 
         private void Initialize()
         {
-            _bufferManager = new GrowingByteBufferManager(_configuration.InitialPooledBufferCount, _configuration.ReceiveBufferSize);
             _keepAliveTracker = KeepAliveTracker.Create(KeepAliveInterval, new TimerCallback((s) => OnKeepAlive()));
             _keepAliveTimeoutTimer = new Timer(new TimerCallback((s) => OnKeepAliveTimeout()), null, Timeout.Infinite, Timeout.Infinite);
             _closingTimeoutTimer = new Timer(new TimerCallback((s) => OnCloseTimeout()), null, Timeout.Infinite, Timeout.Infinite);
@@ -241,7 +242,7 @@ namespace Cowboy.WebSockets
                 }
                 _stream = negotiator.Result;
 
-                _receiveBuffer = _bufferManager.BorrowBuffer();
+                _receiveBuffer = _configuration.BufferManager.BorrowBuffer();
                 _receiveBufferOffset = 0;
 
                 var handshaker = OpenHandshake();
@@ -397,7 +398,7 @@ namespace Cowboy.WebSockets
                             "Handshake with remote [{0}] failed due to receive zero bytes.", RemoteEndPoint));
                     }
 
-                    BufferDeflector.ReplaceBuffer(_bufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
+                    BufferDeflector.ReplaceBuffer(_configuration.BufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
 
                     if (_receiveBufferOffset > 2048)
                     {
@@ -408,7 +409,7 @@ namespace Cowboy.WebSockets
 
                 handshakeResult = WebSocketClientHandshaker.VerifyOpenningHandshakeResponse(this, _receiveBuffer, 0, terminatorIndex + Consts.HttpMessageTerminator.Length, _secWebSocketKey);
 
-                BufferDeflector.ShiftBuffer(_bufferManager, terminatorIndex + Consts.HttpMessageTerminator.Length, ref _receiveBuffer, ref _receiveBufferOffset);
+                BufferDeflector.ShiftBuffer(_configuration.BufferManager, terminatorIndex + Consts.HttpMessageTerminator.Length, ref _receiveBuffer, ref _receiveBufferOffset);
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -444,7 +445,7 @@ namespace Cowboy.WebSockets
                         break;
 
                     _keepAliveTracker.OnDataReceived();
-                    BufferDeflector.ReplaceBuffer(_bufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
+                    BufferDeflector.ReplaceBuffer(_configuration.BufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
                     consumedLength = 0;
 
                     while (true)
@@ -527,7 +528,7 @@ namespace Cowboy.WebSockets
 
                     try
                     {
-                        BufferDeflector.ShiftBuffer(_bufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
+                        BufferDeflector.ShiftBuffer(_configuration.BufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
                     }
                     catch (ArgumentOutOfRangeException) { }
                 }
@@ -795,7 +796,7 @@ namespace Cowboy.WebSockets
             catch (Exception) { }
 
             if (_receiveBuffer != null)
-                _bufferManager.ReturnBuffer(_receiveBuffer);
+                _configuration.BufferManager.ReturnBuffer(_receiveBuffer);
             _receiveBufferOffset = 0;
 
             if (shallNotifyUserSide)

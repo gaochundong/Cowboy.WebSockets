@@ -9,7 +9,7 @@ namespace Cowboy.WebSockets
     {
         public WebSocketClientConfiguration()
         {
-            InitialPooledBufferCount = 4;
+            BufferManager = new GrowingByteBufferManager(4, 8192);
             ReceiveBufferSize = 8192;
             SendBufferSize = 8192;
             ReceiveTimeout = TimeSpan.Zero;
@@ -30,7 +30,7 @@ namespace Cowboy.WebSockets
             ReasonableFragmentSize = 4096;
         }
 
-        public int InitialPooledBufferCount { get; set; }
+        public IBufferManager BufferManager { get; set; }
         public int ReceiveBufferSize { get; set; }
         public int SendBufferSize { get; set; }
         public TimeSpan ReceiveTimeout { get; set; }

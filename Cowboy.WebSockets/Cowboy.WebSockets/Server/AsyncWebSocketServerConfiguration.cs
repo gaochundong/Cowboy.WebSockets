@@ -4,6 +4,7 @@ using System.Net.Security;
 using System.Net.Sockets;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
+using Cowboy.Buffer;
 using Cowboy.WebSockets.Extensions;
 using Cowboy.WebSockets.SubProtocols;
 
@@ -13,7 +14,7 @@ namespace Cowboy.WebSockets
     {
         public AsyncWebSocketServerConfiguration()
         {
-            InitialPooledBufferCount = 100;
+            BufferManager = new GrowingByteBufferManager(20, 8192);
             ReceiveBufferSize = 8192;
             SendBufferSize = 8192;
             ReceiveTimeout = TimeSpan.Zero;
@@ -45,7 +46,7 @@ namespace Cowboy.WebSockets
             EnabledSubProtocols = new Dictionary<string, IWebSocketSubProtocolNegotiator>();
         }
 
-        public int InitialPooledBufferCount { get; set; }
+        public IBufferManager BufferManager { get; set; }
         public int ReceiveBufferSize { get; set; }
         public int SendBufferSize { get; set; }
         public TimeSpan ReceiveTimeout { get; set; }

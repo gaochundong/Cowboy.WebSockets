@@ -16,7 +16,6 @@ namespace Cowboy.WebSockets
         #region Fields
 
         private static readonly ILog _log = Logger.Get<AsyncWebSocketServer>();
-        private IBufferManager _bufferManager;
         private TcpListener _listener;
         private readonly ConcurrentDictionary<string, AsyncWebSocketSession> _sessions = new ConcurrentDictionary<string, AsyncWebSocketSession>();
         private readonly AsyncWebSocketServerModuleCatalog _catalog;
@@ -53,12 +52,14 @@ namespace Cowboy.WebSockets
             _catalog = catalog;
             _configuration = configuration ?? new AsyncWebSocketServerConfiguration();
 
+            if (_configuration.BufferManager == null)
+                throw new InvalidProgramException("The buffer manager in configuration cannot be null.");
+
             Initialize();
         }
 
         private void Initialize()
         {
-            _bufferManager = new GrowingByteBufferManager(_configuration.InitialPooledBufferCount, _configuration.ReceiveBufferSize);
             _routeResolver = new AsyncWebSocketRouteResolver(_catalog);
         }
 
@@ -176,7 +177,7 @@ namespace Cowboy.WebSockets
 
         private async Task Process(TcpClient acceptedTcpClient)
         {
-            var session = new AsyncWebSocketSession(acceptedTcpClient, _configuration, _bufferManager, _routeResolver, this);
+            var session = new AsyncWebSocketSession(acceptedTcpClient, _configuration, _configuration.BufferManager, _routeResolver, this);
 
             if (_sessions.TryAdd(session.SessionKey, session))
             {
