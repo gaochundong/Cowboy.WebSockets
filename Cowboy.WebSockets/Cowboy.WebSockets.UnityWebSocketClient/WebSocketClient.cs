@@ -422,8 +422,15 @@ namespace Cowboy.WebSockets
 
         private void HandleDataReceived(IAsyncResult ar)
         {
+            if (!(_tcpClient != null && _tcpClient.Client.Connected))
+                return;
+
             try
             {
+                // when callback to here the stream may have been closed
+                if (_stream == null)
+                    return;
+
                 int numberOfReadBytes = 0;
                 try
                 {
