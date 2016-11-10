@@ -60,15 +60,6 @@ namespace Cowboy.WebSockets
 
             if (_configuration.BufferManager == null)
                 throw new InvalidProgramException("The buffer manager in configuration cannot be null.");
-
-            Initialize();
-        }
-
-        private void Initialize()
-        {
-            _keepAliveTracker = KeepAliveTracker.Create(KeepAliveInterval, new TimerCallback((s) => OnKeepAlive()));
-            _keepAliveTimeoutTimer = new Timer(new TimerCallback((s) => OnKeepAliveTimeout()), null, Timeout.Infinite, Timeout.Infinite);
-            _closingTimeoutTimer = new Timer(new TimerCallback((s) => OnCloseTimeout()), null, Timeout.Infinite, Timeout.Infinite);
         }
 
         private IPEndPoint ResolveRemoteEndPoint(Uri uri)
@@ -174,6 +165,9 @@ namespace Cowboy.WebSockets
             {
                 throw new InvalidOperationException("This websocket client has already connected to server.");
             }
+
+            Clean();
+            ResetKeepAlive();
 
             _tcpClient = _localEndPoint != null ? new TcpClient(_localEndPoint) : new TcpClient(_remoteEndPoint.Address.AddressFamily);
 
@@ -396,6 +390,13 @@ namespace Cowboy.WebSockets
             }
 
             return handshakeResult;
+        }
+
+        private void ResetKeepAlive()
+        {
+            _keepAliveTracker = KeepAliveTracker.Create(KeepAliveInterval, new TimerCallback((s) => OnKeepAlive()));
+            _keepAliveTimeoutTimer = new Timer(new TimerCallback((s) => OnKeepAliveTimeout()), null, Timeout.Infinite, Timeout.Infinite);
+            _closingTimeoutTimer = new Timer(new TimerCallback((s) => OnCloseTimeout()), null, Timeout.Infinite, Timeout.Infinite);
         }
 
         #endregion
@@ -731,36 +732,7 @@ namespace Cowboy.WebSockets
                 return;
             }
 
-            try
-            {
-                if (_keepAliveTracker != null)
-                {
-                    _keepAliveTracker.Dispose();
-                }
-                if (_keepAliveTimeoutTimer != null)
-                {
-                    _keepAliveTimeoutTimer.Dispose();
-                }
-                if (_closingTimeoutTimer != null)
-                {
-                    _closingTimeoutTimer.Dispose();
-                }
-                if (_stream != null)
-                {
-                    _stream.Dispose();
-                    _stream = null;
-                }
-                if (_tcpClient != null && _tcpClient.Connected)
-                {
-                    _tcpClient.Close();
-                    _tcpClient = null;
-                }
-            }
-            catch (Exception) { }
-
-            if (_receiveBuffer != null)
-                _configuration.BufferManager.ReturnBuffer(_receiveBuffer);
-            _receiveBufferOffset = 0;
+            Clean();
 
             if (shallNotifyUserSide)
             {
@@ -775,6 +747,66 @@ namespace Cowboy.WebSockets
                     HandleUserSideError(ex);
                 }
             }
+        }
+
+        private void Clean()
+        {
+            try
+            {
+                try
+                {
+                    if (_keepAliveTracker != null)
+                    {
+                        _keepAliveTracker.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_keepAliveTimeoutTimer != null)
+                    {
+                        _keepAliveTimeoutTimer.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_closingTimeoutTimer != null)
+                    {
+                        _closingTimeoutTimer.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_stream != null)
+                    {
+                        _stream.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_tcpClient != null)
+                    {
+                        _tcpClient.Close();
+                    }
+                }
+                catch { }
+            }
+            catch { }
+            finally
+            {
+                _keepAliveTracker = null;
+                _keepAliveTimeoutTimer = null;
+                _closingTimeoutTimer = null;
+                _stream = null;
+                _tcpClient = null;
+            }
+
+            if (_receiveBuffer != null)
+                _configuration.BufferManager.ReturnBuffer(_receiveBuffer);
+            _receiveBufferOffset = 0;
         }
 
         public void Abort()

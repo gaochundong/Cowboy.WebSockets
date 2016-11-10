@@ -31,7 +31,7 @@ namespace Cowboy.WebSockets
         private readonly IFrameBuilder _frameBuilder = new WebSocketFrameBuilder();
         private readonly string _sessionKey;
         private Stream _stream;
-        private ArraySegment<byte> _receiveBuffer;
+        private ArraySegment<byte> _receiveBuffer = default(ArraySegment<byte>);
         private int _receiveBufferOffset = 0;
         private IPEndPoint _remoteEndPoint;
         private IPEndPoint _localEndPoint;
@@ -83,10 +83,6 @@ namespace Cowboy.WebSockets
                     (IPEndPoint)_tcpClient.Client.RemoteEndPoint : null;
             _localEndPoint = (_tcpClient != null && _tcpClient.Client.Connected) ?
                     (IPEndPoint)_tcpClient.Client.LocalEndPoint : null;
-
-            _keepAliveTracker = KeepAliveTracker.Create(KeepAliveInterval, new TimerCallback((s) => OnKeepAlive()));
-            _keepAliveTimeoutTimer = new Timer(new TimerCallback((s) => OnKeepAliveTimeout()), null, Timeout.Infinite, Timeout.Infinite);
-            _closingTimeoutTimer = new Timer(new TimerCallback((s) => OnCloseTimeout()), null, Timeout.Infinite, Timeout.Infinite);
         }
 
         #endregion
@@ -169,6 +165,7 @@ namespace Cowboy.WebSockets
 
             try
             {
+                ResetKeepAlive();
                 ConfigureClient();
 
                 var negotiator = NegotiateStream(_tcpClient.GetStream());
@@ -373,6 +370,13 @@ namespace Cowboy.WebSockets
             }
 
             return handshakeResult;
+        }
+
+        private void ResetKeepAlive()
+        {
+            _keepAliveTracker = KeepAliveTracker.Create(KeepAliveInterval, new TimerCallback((s) => OnKeepAlive()));
+            _keepAliveTimeoutTimer = new Timer(new TimerCallback((s) => OnKeepAliveTimeout()), null, Timeout.Infinite, Timeout.Infinite);
+            _closingTimeoutTimer = new Timer(new TimerCallback((s) => OnCloseTimeout()), null, Timeout.Infinite, Timeout.Infinite);
         }
 
         #endregion
@@ -713,36 +717,7 @@ namespace Cowboy.WebSockets
                 return;
             }
 
-            try
-            {
-                if (_keepAliveTracker != null)
-                {
-                    _keepAliveTracker.Dispose();
-                }
-                if (_keepAliveTimeoutTimer != null)
-                {
-                    _keepAliveTimeoutTimer.Dispose();
-                }
-                if (_closingTimeoutTimer != null)
-                {
-                    _closingTimeoutTimer.Dispose();
-                }
-                if (_stream != null)
-                {
-                    _stream.Dispose();
-                    _stream = null;
-                }
-                if (_tcpClient != null && _tcpClient.Connected)
-                {
-                    _tcpClient.Dispose();
-                    _tcpClient = null;
-                }
-            }
-            catch (Exception) { }
-
-            if (_receiveBuffer != null)
-                _bufferManager.ReturnBuffer(_receiveBuffer);
-            _receiveBufferOffset = 0;
+            Clean();
 
             _log.DebugFormat("Session closed for [{0}] on [{1}] in dispatcher [{2}] with session count [{3}].",
                 this.RemoteEndPoint,
@@ -757,6 +732,67 @@ namespace Cowboy.WebSockets
             {
                 HandleUserSideError(ex);
             }
+        }
+
+        private void Clean()
+        {
+            try
+            {
+                try
+                {
+                    if (_keepAliveTracker != null)
+                    {
+                        _keepAliveTracker.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_keepAliveTimeoutTimer != null)
+                    {
+                        _keepAliveTimeoutTimer.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_closingTimeoutTimer != null)
+                    {
+                        _closingTimeoutTimer.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_stream != null)
+                    {
+                        _stream.Dispose();
+                    }
+                }
+                catch { }
+                try
+                {
+                    if (_tcpClient != null)
+                    {
+                        _tcpClient.Dispose();
+                    }
+                }
+                catch { }
+            }
+            catch { }
+            finally
+            {
+                _keepAliveTracker = null;
+                _keepAliveTimeoutTimer = null;
+                _closingTimeoutTimer = null;
+                _stream = null;
+                _tcpClient = null;
+            }
+
+            if (_receiveBuffer != default(ArraySegment<byte>))
+                _bufferManager.ReturnBuffer(_receiveBuffer);
+            _receiveBuffer = default(ArraySegment<byte>);
+            _receiveBufferOffset = 0;
         }
 
         public async Task Abort()
