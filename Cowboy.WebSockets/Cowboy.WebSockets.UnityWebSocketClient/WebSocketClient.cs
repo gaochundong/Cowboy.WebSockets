@@ -20,7 +20,7 @@ namespace Cowboy.WebSockets
         private IPEndPoint _remoteEndPoint = null;
         private IPEndPoint _localEndPoint = null;
         private Stream _stream;
-        private byte[] _receiveBuffer;
+        private ArraySegment<byte> _receiveBuffer = default(ArraySegment<byte>);
         private int _receiveBufferOffset = 0;
 
         private readonly Uri _uri;
@@ -171,7 +171,8 @@ namespace Cowboy.WebSockets
 
             _tcpClient = _localEndPoint != null ? new TcpClient(_localEndPoint) : new TcpClient(_remoteEndPoint.Address.AddressFamily);
 
-            _receiveBuffer = _configuration.BufferManager.BorrowBuffer();
+            if (_receiveBuffer == default(ArraySegment<byte>))
+                _receiveBuffer = _configuration.BufferManager.BorrowBuffer();
             _receiveBufferOffset = 0;
 
             var ar = _tcpClient.BeginConnect(_remoteEndPoint.Address, _remoteEndPoint.Port, null, _tcpClient);
@@ -349,9 +350,9 @@ namespace Cowboy.WebSockets
                 _stream.EndWrite(ar);
 
                 int terminatorIndex = -1;
-                while (!WebSocketHelpers.FindHttpMessageTerminator(_receiveBuffer, _receiveBufferOffset, out terminatorIndex))
+                while (!WebSocketHelpers.FindHttpMessageTerminator(_receiveBuffer.Array, _receiveBuffer.Offset, _receiveBufferOffset, out terminatorIndex))
                 {
-                    ar = _stream.BeginRead(_receiveBuffer, _receiveBufferOffset, _receiveBuffer.Length - _receiveBufferOffset, null, _stream);
+                    ar = _stream.BeginRead(_receiveBuffer.Array, _receiveBuffer.Offset + _receiveBufferOffset, _receiveBuffer.Count - _receiveBufferOffset, null, _stream);
                     if (!ar.AsyncWaitHandle.WaitOne(ConnectTimeout))
                     {
                         Close(WebSocketCloseCode.ProtocolError, "Opening handshake timeout.");
@@ -366,7 +367,7 @@ namespace Cowboy.WebSockets
                             "Handshake with remote [{0}] failed due to receive zero bytes.", RemoteEndPoint));
                     }
 
-                    BufferDeflector.ReplaceBuffer(_configuration.BufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
+                    SegmentBufferDeflector.ReplaceBuffer(_configuration.BufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
 
                     if (_receiveBufferOffset > 2048)
                     {
@@ -375,9 +376,9 @@ namespace Cowboy.WebSockets
                     }
                 }
 
-                handshakeResult = WebSocketClientHandshaker.VerifyOpenningHandshakeResponse(this, _receiveBuffer, 0, terminatorIndex + Consts.HttpMessageTerminator.Length, _secWebSocketKey);
+                handshakeResult = WebSocketClientHandshaker.VerifyOpenningHandshakeResponse(this, _receiveBuffer.Array, _receiveBuffer.Offset, terminatorIndex + Consts.HttpMessageTerminator.Length, _secWebSocketKey);
 
-                BufferDeflector.ShiftBuffer(_configuration.BufferManager, terminatorIndex + Consts.HttpMessageTerminator.Length, ref _receiveBuffer, ref _receiveBufferOffset);
+                SegmentBufferDeflector.ShiftBuffer(_configuration.BufferManager, terminatorIndex + Consts.HttpMessageTerminator.Length, ref _receiveBuffer, ref _receiveBufferOffset);
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -409,7 +410,7 @@ namespace Cowboy.WebSockets
             {
                 try
                 {
-                    _stream.BeginRead(_receiveBuffer, _receiveBufferOffset, _receiveBuffer.Length - _receiveBufferOffset, HandleDataReceived, _stream);
+                    _stream.BeginRead(_receiveBuffer.Array, _receiveBuffer.Offset + _receiveBufferOffset, _receiveBuffer.Count - _receiveBufferOffset, HandleDataReceived, _stream);
                 }
                 catch (Exception ex)
                 {
@@ -461,7 +462,7 @@ namespace Cowboy.WebSockets
         private void ReceiveBuffer(int receiveCount)
         {
             _keepAliveTracker.OnDataReceived();
-            BufferDeflector.ReplaceBuffer(_configuration.BufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
+            SegmentBufferDeflector.ReplaceBuffer(_configuration.BufferManager, ref _receiveBuffer, ref _receiveBufferOffset, receiveCount);
 
             Header frameHeader;
             byte[] payload;
@@ -471,7 +472,7 @@ namespace Cowboy.WebSockets
 
             while (true)
             {
-                if (_frameBuilder.TryDecodeFrameHeader(_receiveBuffer, consumedLength, _receiveBufferOffset - consumedLength, out frameHeader)
+                if (_frameBuilder.TryDecodeFrameHeader(_receiveBuffer.Array, _receiveBuffer.Offset + consumedLength, _receiveBufferOffset - consumedLength, out frameHeader)
                     && frameHeader.Length + frameHeader.PayloadLength <= _receiveBufferOffset - consumedLength)
                 {
                     try
@@ -483,7 +484,7 @@ namespace Cowboy.WebSockets
                                 "Client received masked frame [{0}] from remote [{1}].", frameHeader.OpCode, RemoteEndPoint));
                         }
 
-                        _frameBuilder.DecodePayload(_receiveBuffer, consumedLength, frameHeader, out payload, out payloadOffset, out payloadCount);
+                        _frameBuilder.DecodePayload(_receiveBuffer.Array, _receiveBuffer.Offset + consumedLength, frameHeader, out payload, out payloadOffset, out payloadCount);
 
                         switch (frameHeader.OpCode)
                         {
@@ -544,7 +545,7 @@ namespace Cowboy.WebSockets
 
             try
             {
-                BufferDeflector.ShiftBuffer(_configuration.BufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
+                SegmentBufferDeflector.ShiftBuffer(_configuration.BufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
             }
             catch (ArgumentOutOfRangeException) { }
         }
@@ -804,8 +805,9 @@ namespace Cowboy.WebSockets
                 _tcpClient = null;
             }
 
-            if (_receiveBuffer != null)
+            if (_receiveBuffer != default(ArraySegment<byte>))
                 _configuration.BufferManager.ReturnBuffer(_receiveBuffer);
+            _receiveBuffer = default(ArraySegment<byte>);
             _receiveBufferOffset = 0;
         }
 

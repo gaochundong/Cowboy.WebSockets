@@ -9,7 +9,7 @@
     <AppDesignerFolder>Properties</AppDesignerFolder>
     <RootNamespace>Cowboy.WebSockets.UnityWebSocketClient</RootNamespace>
     <AssemblyName>Cowboy.WebSockets.UnityWebSocketClient</AssemblyName>
-    <TargetFrameworkVersion>v4.5.2</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v2.0</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
   </PropertyGroup>
@@ -41,10 +41,12 @@
     <Compile Include="..\SolutionVersion.cs">
       <Link>SolutionVersion.cs</Link>
     </Compile>
-    <Compile Include="Buffer\BufferDeflector.cs" />
     <Compile Include="Buffer\BufferValidator.cs" />
-    <Compile Include="Buffer\GrowingByteBufferManager.cs" />
-    <Compile Include="Buffer\IBufferManager.cs" />
+    <Compile Include="Buffer\ISegmentBufferManager.cs" />
+    <Compile Include="Buffer\SegmentBufferDeflector.cs" />
+    <Compile Include="Buffer\SegmentBufferManager.cs" />
+    <Compile Include="Buffer\UnableToAllocateBufferException.cs" />
+    <Compile Include="Buffer\UnableToCreateMemoryException .cs" />
     <Compile Include="EventArgs\WebSocketServerTextReceivedEventArgs.cs" />
     <Compile Include="EventArgs\WebSocketServerConnectedEventArgs.cs" />
     <Compile Include="EventArgs\WebSocketServerBinaryReceivedEventArgs.cs" />

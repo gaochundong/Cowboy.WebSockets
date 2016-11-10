@@ -38,9 +38,6 @@ namespace Cowboy.WebSockets.TestAsyncWebSocketServer
                 Console.WriteLine("{0} Bytes", count);
             }
 
-            //await Task.Delay(TimeSpan.FromSeconds(10));
-            //await Task.CompletedTask;
-
             await session.SendBinaryAsync(Encoding.UTF8.GetBytes(text));
         }
 
