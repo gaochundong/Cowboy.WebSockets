@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Cowboy.Buffer;
 
 namespace Cowboy.WebSockets.Extensions
 {
@@ -18,7 +19,8 @@ namespace Cowboy.WebSockets.Extensions
 
         public PerMessageCompressionExtension()
         {
-            _deflater = new DeflateCompression();
+            var bufferAllocator = new SegmentBufferManager(100, 8192, 1, true);
+            _deflater = new DeflateCompression(bufferAllocator);
         }
 
         public PerMessageCompressionExtension(SortedList<int, AgreedExtensionParameter> agreedParameters)

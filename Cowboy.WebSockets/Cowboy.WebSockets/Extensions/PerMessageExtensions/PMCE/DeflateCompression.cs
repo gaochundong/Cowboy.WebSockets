@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.IO;
 using System.IO.Compression;
 using Cowboy.Buffer;
@@ -7,16 +8,13 @@ namespace Cowboy.WebSockets.Extensions
 {
     public class DeflateCompression
     {
-        private readonly IBufferManager _bufferAllocator;
+        private readonly ISegmentBufferManager _bufferAllocator;
 
-        public DeflateCompression()
-            : this(16, 1024)
+        public DeflateCompression(ISegmentBufferManager bufferAllocator)
         {
-        }
-
-        public DeflateCompression(int initialPooledBufferCount, int bufferSize)
-        {
-            _bufferAllocator = new GrowingByteBufferManager(initialPooledBufferCount, bufferSize);
+            if (bufferAllocator == null)
+                throw new ArgumentNullException("bufferAllocator");
+            _bufferAllocator = bufferAllocator;
         }
 
         public byte[] Compress(byte[] raw)
@@ -57,10 +55,10 @@ namespace Cowboy.WebSockets.Extensions
                     int readCount = 0;
                     do
                     {
-                        readCount = deflate.Read(buffer, 0, buffer.Length);
+                        readCount = deflate.Read(buffer.Array, buffer.Offset, buffer.Count);
                         if (readCount > 0)
                         {
-                            memory.Write(buffer, 0, readCount);
+                            memory.Write(buffer.Array, buffer.Offset, readCount);
                         }
                     }
                     while (readCount > 0);
