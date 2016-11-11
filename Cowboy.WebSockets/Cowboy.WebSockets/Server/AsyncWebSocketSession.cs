@@ -91,22 +91,11 @@ namespace Cowboy.WebSockets
 
         public string SessionKey { get { return _sessionKey; } }
         public DateTime StartTime { get; private set; }
-        public IPEndPoint RemoteEndPoint
-        {
-            get
-            {
-                return (_tcpClient != null && _tcpClient.Client.Connected) ?
-                    (IPEndPoint)_tcpClient.Client.RemoteEndPoint : _remoteEndPoint;
-            }
-        }
-        public IPEndPoint LocalEndPoint
-        {
-            get
-            {
-                return (_tcpClient != null && _tcpClient.Client.Connected) ?
-                    (IPEndPoint)_tcpClient.Client.LocalEndPoint : _localEndPoint;
-            }
-        }
+
+        private bool Connected { get { return _tcpClient != null && _tcpClient.Client.Connected; } }
+        public IPEndPoint RemoteEndPoint { get { return Connected ? (IPEndPoint)_tcpClient.Client.RemoteEndPoint : _remoteEndPoint; } }
+        public IPEndPoint LocalEndPoint { get { return Connected ? (IPEndPoint)_tcpClient.Client.LocalEndPoint : _localEndPoint; } }
+
         public AsyncWebSocketServer Server { get { return _server; } }
 
         public TimeSpan ConnectTimeout { get { return _configuration.ConnectTimeout; } }
@@ -156,11 +145,11 @@ namespace Cowboy.WebSockets
             int origin = Interlocked.CompareExchange(ref _state, _connecting, _none);
             if (origin == _disposed)
             {
-                throw new ObjectDisposedException(GetType().FullName);
+                throw new ObjectDisposedException("This websocket session has been disposed when connecting.");
             }
             else if (origin != _none)
             {
-                throw new InvalidOperationException("This websocket socket session has already started.");
+                throw new InvalidOperationException("This websocket session is in invalid state when connecting.");
             }
 
             try
@@ -197,7 +186,8 @@ namespace Cowboy.WebSockets
 
                 if (Interlocked.CompareExchange(ref _state, _connected, _connecting) != _connecting)
                 {
-                    throw new ObjectDisposedException(GetType().FullName);
+                    await Abort();
+                    throw new ObjectDisposedException("This websocket session has been disposed after connected.");
                 }
 
                 _log.DebugFormat("Session started for [{0}] on [{1}] in module [{2}] with session count [{3}].",
@@ -321,7 +311,10 @@ namespace Cowboy.WebSockets
                 int terminatorIndex = -1;
                 while (!WebSocketHelpers.FindHttpMessageTerminator(_receiveBuffer.Array, _receiveBuffer.Offset, _receiveBufferOffset, out terminatorIndex))
                 {
-                    int receiveCount = await _stream.ReadAsync(_receiveBuffer.Array, _receiveBuffer.Offset + _receiveBufferOffset, _receiveBuffer.Count - _receiveBufferOffset);
+                    int receiveCount = await _stream.ReadAsync(
+                        _receiveBuffer.Array,
+                        _receiveBuffer.Offset + _receiveBufferOffset,
+                        _receiveBuffer.Count - _receiveBufferOffset);
                     if (receiveCount == 0)
                     {
                         throw new WebSocketHandshakeException(string.Format(
@@ -340,8 +333,11 @@ namespace Cowboy.WebSockets
                 string secWebSocketKey = string.Empty;
                 string path = string.Empty;
                 string query = string.Empty;
-                handshakeResult = WebSocketServerHandshaker.HandleOpenningHandshakeRequest(this,
-                    _receiveBuffer.Array, _receiveBuffer.Offset, terminatorIndex + Consts.HttpMessageTerminator.Length,
+                handshakeResult = WebSocketServerHandshaker.HandleOpenningHandshakeRequest(
+                    this,
+                    _receiveBuffer.Array,
+                    _receiveBuffer.Offset,
+                    terminatorIndex + Consts.HttpMessageTerminator.Length,
                     out secWebSocketKey, out path, out query);
 
                 _module = _routeResolver.Resolve(path, query);
@@ -357,7 +353,11 @@ namespace Cowboy.WebSockets
                     await _stream.WriteAsync(responseBuffer, 0, responseBuffer.Length);
                 }
 
-                SegmentBufferDeflector.ShiftBuffer(_bufferManager, terminatorIndex + Consts.HttpMessageTerminator.Length, ref _receiveBuffer, ref _receiveBufferOffset);
+                SegmentBufferDeflector.ShiftBuffer(
+                    _bufferManager,
+                    terminatorIndex + Consts.HttpMessageTerminator.Length,
+                    ref _receiveBuffer,
+                    ref _receiveBufferOffset);
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -395,7 +395,10 @@ namespace Cowboy.WebSockets
 
                 while (State == WebSocketState.Open || State == WebSocketState.Closing)
                 {
-                    int receiveCount = await _stream.ReadAsync(_receiveBuffer.Array, _receiveBuffer.Offset + _receiveBufferOffset, _receiveBuffer.Count - _receiveBufferOffset);
+                    int receiveCount = await _stream.ReadAsync(
+                        _receiveBuffer.Array,
+                        _receiveBuffer.Offset + _receiveBufferOffset,
+                        _receiveBuffer.Count - _receiveBufferOffset);
                     if (receiveCount == 0)
                         break;
 
@@ -410,7 +413,11 @@ namespace Cowboy.WebSockets
                         payloadOffset = 0;
                         payloadCount = 0;
 
-                        if (_frameBuilder.TryDecodeFrameHeader(_receiveBuffer.Array, _receiveBuffer.Offset + consumedLength, _receiveBufferOffset - consumedLength, out frameHeader)
+                        if (_frameBuilder.TryDecodeFrameHeader(
+                            _receiveBuffer.Array,
+                            _receiveBuffer.Offset + consumedLength,
+                            _receiveBufferOffset - consumedLength,
+                            out frameHeader)
                             && frameHeader.Length + frameHeader.PayloadLength <= _receiveBufferOffset - consumedLength)
                         {
                             try
@@ -422,7 +429,11 @@ namespace Cowboy.WebSockets
                                         "Server received unmasked frame [{0}] from remote [{1}].", frameHeader.OpCode, RemoteEndPoint));
                                 }
 
-                                _frameBuilder.DecodePayload(_receiveBuffer.Array, _receiveBuffer.Offset + consumedLength, frameHeader, out payload, out payloadOffset, out payloadCount);
+                                _frameBuilder.DecodePayload(
+                                    _receiveBuffer.Array,
+                                    _receiveBuffer.Offset + consumedLength,
+                                    frameHeader,
+                                    out payload, out payloadOffset, out payloadCount);
 
                                 switch (frameHeader.OpCode)
                                 {

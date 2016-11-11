@@ -32,7 +32,7 @@ namespace Cowboy.WebSockets
         private const int _connecting = 1;
         private const int _connected = 2;
         private const int _closing = 3;
-        private const int _disposed = 5;
+        private const int _closed = 5;
 
         private readonly Semaphore _keepAliveLocker = new Semaphore(1, 1);
         private KeepAliveTracker _keepAliveTracker;
@@ -98,22 +98,9 @@ namespace Cowboy.WebSockets
 
         #region Properties
 
-        public IPEndPoint RemoteEndPoint
-        {
-            get
-            {
-                return (_tcpClient != null && _tcpClient.Client.Connected) ?
-                    (IPEndPoint)_tcpClient.Client.RemoteEndPoint : _remoteEndPoint;
-            }
-        }
-        public IPEndPoint LocalEndPoint
-        {
-            get
-            {
-                return (_tcpClient != null && _tcpClient.Client.Connected) ?
-                    (IPEndPoint)_tcpClient.Client.LocalEndPoint : _localEndPoint;
-            }
-        }
+        private bool Connected { get { return _tcpClient != null && _tcpClient.Client.Connected; } }
+        public IPEndPoint RemoteEndPoint { get { return Connected ? (IPEndPoint)_tcpClient.Client.RemoteEndPoint : _remoteEndPoint; } }
+        public IPEndPoint LocalEndPoint { get { return Connected ? (IPEndPoint)_tcpClient.Client.LocalEndPoint : _localEndPoint; } }
 
         public Uri Uri { get { return _uri; } }
 
@@ -136,7 +123,7 @@ namespace Cowboy.WebSockets
                         return WebSocketState.Open;
                     case _closing:
                         return WebSocketState.Closing;
-                    case _disposed:
+                    case _closed:
                         return WebSocketState.Closed;
                     default:
                         return WebSocketState.Closed;
@@ -156,20 +143,19 @@ namespace Cowboy.WebSockets
 
         public void Connect()
         {
-            int origin = Interlocked.CompareExchange(ref _state, _connecting, _none);
-            if (origin == _disposed)
+            int origin = Interlocked.Exchange(ref _state, _connecting);
+            if (!(origin == _none || origin == _closed))
             {
-                throw new ObjectDisposedException(GetType().FullName);
-            }
-            else if (origin != _none)
-            {
-                throw new InvalidOperationException("This websocket client has already connected to server.");
+                InternalClose(false);
+                throw new InvalidOperationException("This websocket client is in invalid state when connecting.");
             }
 
             Clean();
             ResetKeepAlive();
 
-            _tcpClient = _localEndPoint != null ? new TcpClient(_localEndPoint) : new TcpClient(_remoteEndPoint.Address.AddressFamily);
+            _tcpClient = _localEndPoint != null ? 
+                new TcpClient(_localEndPoint) : 
+                new TcpClient(_remoteEndPoint.Address.AddressFamily);
 
             if (_receiveBuffer == default(ArraySegment<byte>))
                 _receiveBuffer = _configuration.BufferManager.BorrowBuffer();
@@ -205,7 +191,8 @@ namespace Cowboy.WebSockets
 
                 if (Interlocked.CompareExchange(ref _state, _connected, _connecting) != _connecting)
                 {
-                    throw new ObjectDisposedException(GetType().FullName);
+                    InternalClose(false);
+                    throw new InvalidOperationException("This websocket client is in invalid state when connected.");
                 }
 
                 _log(string.Format("Connected to server [{0}] on [{1}].",
@@ -352,7 +339,12 @@ namespace Cowboy.WebSockets
                 int terminatorIndex = -1;
                 while (!WebSocketHelpers.FindHttpMessageTerminator(_receiveBuffer.Array, _receiveBuffer.Offset, _receiveBufferOffset, out terminatorIndex))
                 {
-                    ar = _stream.BeginRead(_receiveBuffer.Array, _receiveBuffer.Offset + _receiveBufferOffset, _receiveBuffer.Count - _receiveBufferOffset, null, _stream);
+                    ar = _stream.BeginRead(
+                        _receiveBuffer.Array,
+                        _receiveBuffer.Offset + _receiveBufferOffset,
+                        _receiveBuffer.Count - _receiveBufferOffset,
+                        null,
+                        _stream);
                     if (!ar.AsyncWaitHandle.WaitOne(ConnectTimeout))
                     {
                         Close(WebSocketCloseCode.ProtocolError, "Opening handshake timeout.");
@@ -376,9 +368,18 @@ namespace Cowboy.WebSockets
                     }
                 }
 
-                handshakeResult = WebSocketClientHandshaker.VerifyOpenningHandshakeResponse(this, _receiveBuffer.Array, _receiveBuffer.Offset, terminatorIndex + Consts.HttpMessageTerminator.Length, _secWebSocketKey);
+                handshakeResult = WebSocketClientHandshaker.VerifyOpenningHandshakeResponse(
+                    this,
+                    _receiveBuffer.Array,
+                    _receiveBuffer.Offset,
+                    terminatorIndex + Consts.HttpMessageTerminator.Length,
+                    _secWebSocketKey);
 
-                SegmentBufferDeflector.ShiftBuffer(_configuration.BufferManager, terminatorIndex + Consts.HttpMessageTerminator.Length, ref _receiveBuffer, ref _receiveBufferOffset);
+                SegmentBufferDeflector.ShiftBuffer(
+                    _configuration.BufferManager,
+                    terminatorIndex + Consts.HttpMessageTerminator.Length,
+                    ref _receiveBuffer,
+                    ref _receiveBufferOffset);
             }
             catch (ArgumentOutOfRangeException)
             {
@@ -410,7 +411,12 @@ namespace Cowboy.WebSockets
             {
                 try
                 {
-                    _stream.BeginRead(_receiveBuffer.Array, _receiveBuffer.Offset + _receiveBufferOffset, _receiveBuffer.Count - _receiveBufferOffset, HandleDataReceived, _stream);
+                    _stream.BeginRead(
+                        _receiveBuffer.Array,
+                        _receiveBuffer.Offset + _receiveBufferOffset,
+                        _receiveBuffer.Count - _receiveBufferOffset,
+                        HandleDataReceived,
+                        _stream);
                 }
                 catch (Exception ex)
                 {
@@ -422,7 +428,7 @@ namespace Cowboy.WebSockets
 
         private void HandleDataReceived(IAsyncResult ar)
         {
-            if (!(_tcpClient != null && _tcpClient.Client.Connected))
+            if (this.State != WebSocketState.Open)
                 return;
 
             try
@@ -479,7 +485,11 @@ namespace Cowboy.WebSockets
 
             while (true)
             {
-                if (_frameBuilder.TryDecodeFrameHeader(_receiveBuffer.Array, _receiveBuffer.Offset + consumedLength, _receiveBufferOffset - consumedLength, out frameHeader)
+                if (_frameBuilder.TryDecodeFrameHeader(
+                    _receiveBuffer.Array,
+                    _receiveBuffer.Offset + consumedLength,
+                    _receiveBufferOffset - consumedLength,
+                    out frameHeader)
                     && frameHeader.Length + frameHeader.PayloadLength <= _receiveBufferOffset - consumedLength)
                 {
                     try
@@ -491,7 +501,11 @@ namespace Cowboy.WebSockets
                                 "Client received masked frame [{0}] from remote [{1}].", frameHeader.OpCode, RemoteEndPoint));
                         }
 
-                        _frameBuilder.DecodePayload(_receiveBuffer.Array, _receiveBuffer.Offset + consumedLength, frameHeader, out payload, out payloadOffset, out payloadCount);
+                        _frameBuilder.DecodePayload(
+                            _receiveBuffer.Array,
+                            _receiveBuffer.Offset + consumedLength,
+                            frameHeader,
+                            out payload, out payloadOffset, out payloadCount);
 
                         switch (frameHeader.OpCode)
                         {
@@ -726,7 +740,7 @@ namespace Cowboy.WebSockets
                         InternalClose(true);
                         return;
                     }
-                case _disposed:
+                case _closed:
                 case _none:
                 default:
                     return;
@@ -735,7 +749,7 @@ namespace Cowboy.WebSockets
 
         private void InternalClose(bool shallNotifyUserSide)
         {
-            if (Interlocked.Exchange(ref _state, _disposed) == _disposed)
+            if (Interlocked.Exchange(ref _state, _closed) == _closed)
             {
                 return;
             }
