@@ -103,10 +103,11 @@ namespace Cowboy.WebSockets
 
                 _listener.Start(_configuration.PendingConnectionBacklog);
 
-                Task.Run(async () =>
+                Task.Factory.StartNew(async () =>
                 {
                     await Accept();
-                })
+                },
+                TaskCreationOptions.LongRunning)
                 .Forget();
             }
             catch (Exception ex) when (!ShouldThrow(ex)) { }
@@ -124,7 +125,7 @@ namespace Cowboy.WebSockets
                 _listener.Stop();
                 _listener = null;
 
-                Task.Run(async () =>
+                Task.Factory.StartNew(async () =>
                 {
                     try
                     {
@@ -134,7 +135,8 @@ namespace Cowboy.WebSockets
                         }
                     }
                     catch (Exception ex) when (!ShouldThrow(ex)) { }
-                })
+                },
+                TaskCreationOptions.PreferFairness)
                 .Wait();
             }
             catch (Exception ex) when (!ShouldThrow(ex)) { }
@@ -161,10 +163,11 @@ namespace Cowboy.WebSockets
                 while (IsListening)
                 {
                     var tcpClient = await _listener.AcceptTcpClientAsync();
-                    Task.Run(async () =>
+                    Task.Factory.StartNew(async () =>
                     {
                         await Process(tcpClient);
-                    })
+                    },
+                    TaskCreationOptions.PreferFairness)
                     .Forget();
                 }
             }

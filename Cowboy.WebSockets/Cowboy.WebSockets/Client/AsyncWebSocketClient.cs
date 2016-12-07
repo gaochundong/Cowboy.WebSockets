@@ -261,11 +261,12 @@ namespace Cowboy.WebSockets
 
                 if (!isErrorOccurredInUserSide)
                 {
-                    Task.Run(async () =>
+                    Task.Factory.StartNew(async () =>
                     {
                         _keepAliveTracker.StartTimer();
                         await Process();
-                    })
+                    },
+                    TaskCreationOptions.LongRunning)
                     .Forget();
                 }
                 else
