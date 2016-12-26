@@ -24,9 +24,9 @@ namespace Cowboy.WebSockets.TestAsyncWebSocketClient
                     //config.SslClientCertificates.Add(new System.Security.Cryptography.X509Certificates.X509Certificate2(@"D:\\Cowboy.cer"));
                     //config.SslPolicyErrorsBypassed = true;
 
-                    //var uri = new Uri("ws://echo.websocket.org/");
-                    //var uri = new Uri("wss://127.0.0.1:22222/test");
-                    var uri = new Uri("ws://127.0.0.1:22222/test");
+                    //var uri = new Uri("ws://echo.websocket.org/");   // connect to websocket.org website
+                    //var uri = new Uri("wss://127.0.0.1:22222/test"); // use wss with ssl
+                    var uri = new Uri("ws://127.0.0.1:22222/test");    // connect to localhost
                     _client = new AsyncWebSocketClient(uri,
                         OnServerTextReceived,
                         OnServerBinaryReceived,
