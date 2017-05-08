@@ -115,7 +115,10 @@ namespace Cowboy.WebSockets
 
             public override void Dispose()
             {
-                _keepAliveTimer.Dispose();
+                if (_keepAliveTimer != null)
+                {
+                    _keepAliveTimer.Dispose();
+                }
             }
 
             private void ResetTimer(int dueInMilliseconds)
