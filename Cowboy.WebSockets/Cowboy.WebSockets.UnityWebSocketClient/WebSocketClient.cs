@@ -905,7 +905,7 @@ namespace Cowboy.WebSockets
             {
                 _log(ex.Message);
 
-                Close(WebSocketCloseCode.AbnormalClosure); // intend to close the session
+                InternalClose(false); // intend to close the session
 
                 return true;
             }

@@ -936,7 +936,7 @@ namespace Cowboy.WebSockets
             {
                 _log.Error(ex.Message, ex);
 
-                await Close(WebSocketCloseCode.AbnormalClosure); // intend to close the session
+                await InternalClose(false); // intend to close the session
 
                 return true;
             }
