@@ -153,8 +153,8 @@ namespace Cowboy.WebSockets
             Clean();
             ResetKeepAlive();
 
-            _tcpClient = _localEndPoint != null ? 
-                new TcpClient(_localEndPoint) : 
+            _tcpClient = _localEndPoint != null ?
+                new TcpClient(_localEndPoint) :
                 new TcpClient(_remoteEndPoint.Address.AddressFamily);
 
             if (_receiveBuffer == default(ArraySegment<byte>))
@@ -420,8 +420,8 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    if (!CloseIfShould(ex))
-                        throw;
+                    HandleReceiveOperationException(ex);
+                    throw;
                 }
             }
         }
@@ -467,8 +467,8 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                if (!CloseIfShould(ex))
-                    throw;
+                HandleReceiveOperationException(ex);
+                throw;
             }
         }
 
@@ -729,8 +729,8 @@ namespace Cowboy.WebSockets
                         }
                         catch (Exception ex)
                         {
-                            if (ShouldThrow(ex))
-                                throw;
+                            HandleSendOperationException(ex);
+                            throw;
                         }
                         return;
                     }
@@ -861,6 +861,30 @@ namespace Cowboy.WebSockets
 
         #region Exception Handler
 
+        private void HandleSendOperationException(Exception ex)
+        {
+            if (IsSocketTimeOut(ex))
+            {
+                CloseIfShould(ex);
+                throw new WebSocketException(ex.Message, new TimeoutException(ex.Message, ex));
+            }
+
+            CloseIfShould(ex);
+            throw new WebSocketException(ex.Message, ex);
+        }
+
+        private void HandleReceiveOperationException(Exception ex)
+        {
+            if (IsSocketTimeOut(ex))
+            {
+                CloseIfShould(ex);
+                throw new WebSocketException(ex.Message, new TimeoutException(ex.Message, ex));
+            }
+
+            CloseIfShould(ex);
+            throw new WebSocketException(ex.Message, ex);
+        }
+
         private bool IsSocketTimeOut(Exception ex)
         {
             return ex is IOException
@@ -875,42 +899,18 @@ namespace Cowboy.WebSockets
                 || ex is InvalidOperationException
                 || ex is SocketException
                 || ex is IOException
-                || ex is NullReferenceException
+                || ex is NullReferenceException // buffer array operation
+                || ex is ArgumentException      // buffer array operation
                 )
             {
                 _log(ex.Message);
 
-                Abort();
+                Close(WebSocketCloseCode.AbnormalClosure); // intend to close the session
 
                 return true;
             }
 
             return false;
-        }
-
-        private bool ShouldThrow(Exception ex)
-        {
-            if (IsSocketTimeOut(ex))
-            {
-                _log(ex.Message);
-                return false;
-            }
-
-            if (ex is ObjectDisposedException
-                || ex is InvalidOperationException
-                || ex is SocketException
-                || ex is IOException
-                || ex is NullReferenceException
-                )
-            {
-                if (ex is SocketException)
-                    _log(string.Format("Client [{0}] exception occurred, [{1}].", this, ex.Message));
-
-                return false;
-            }
-
-            _log(string.Format("Client [{0}] exception occurred, [{1}].", this, ex.Message));
-            return true;
         }
 
         private void HandleUserSideError(Exception ex)
@@ -959,8 +959,8 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                if (!CloseIfShould(ex))
-                    throw;
+                HandleSendOperationException(ex);
+                throw;
             }
         }
 
@@ -1001,8 +1001,8 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                if (!CloseIfShould(ex))
-                    throw;
+                HandleSendOperationException(ex);
+                throw;
             }
         }
 
@@ -1015,8 +1015,8 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                if (!CloseIfShould(ex))
-                    throw;
+                HandleSendOperationException(ex);
+                throw;
             }
         }
 
@@ -1057,11 +1057,9 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                if (!CloseIfShould(ex))
-                    throw;
+                HandleSendOperationException(ex);
+                throw;
             }
-
-            return null;
         }
 
         public void EndSendText(IAsyncResult asyncResult)
@@ -1083,8 +1081,8 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                if (!CloseIfShould(ex))
-                    throw;
+                HandleSendOperationException(ex);
+                throw;
             }
         }
 
