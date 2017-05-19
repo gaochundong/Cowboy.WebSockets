@@ -256,7 +256,7 @@ namespace Cowboy.WebSockets
                 catch (Exception ex)
                 {
                     isErrorOccurredInUserSide = true;
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
 
                 if (!isErrorOccurredInUserSide)
@@ -371,8 +371,8 @@ namespace Cowboy.WebSockets
                 while (!WebSocketHelpers.FindHttpMessageTerminator(_receiveBuffer.Array, _receiveBuffer.Offset, _receiveBufferOffset, out terminatorIndex))
                 {
                     int receiveCount = await _stream.ReadAsync(
-                        _receiveBuffer.Array, 
-                        _receiveBuffer.Offset + _receiveBufferOffset, 
+                        _receiveBuffer.Array,
+                        _receiveBuffer.Offset + _receiveBufferOffset,
                         _receiveBuffer.Count - _receiveBufferOffset);
                     if (receiveCount == 0)
                     {
@@ -390,16 +390,16 @@ namespace Cowboy.WebSockets
                 }
 
                 handshakeResult = WebSocketClientHandshaker.VerifyOpenningHandshakeResponse(
-                    this, 
-                    _receiveBuffer.Array, 
-                    _receiveBuffer.Offset, 
-                    terminatorIndex + Consts.HttpMessageTerminator.Length, 
+                    this,
+                    _receiveBuffer.Array,
+                    _receiveBuffer.Offset,
+                    terminatorIndex + Consts.HttpMessageTerminator.Length,
                     _secWebSocketKey);
 
                 SegmentBufferDeflector.ShiftBuffer(
-                    _configuration.BufferManager, 
-                    terminatorIndex + Consts.HttpMessageTerminator.Length, 
-                    ref _receiveBuffer, 
+                    _configuration.BufferManager,
+                    terminatorIndex + Consts.HttpMessageTerminator.Length,
+                    ref _receiveBuffer,
                     ref _receiveBufferOffset);
             }
             catch (ArgumentOutOfRangeException)
@@ -439,8 +439,8 @@ namespace Cowboy.WebSockets
                 while (State == WebSocketState.Open || State == WebSocketState.Closing)
                 {
                     int receiveCount = await _stream.ReadAsync(
-                        _receiveBuffer.Array, 
-                        _receiveBuffer.Offset + _receiveBufferOffset, 
+                        _receiveBuffer.Array,
+                        _receiveBuffer.Offset + _receiveBufferOffset,
                         _receiveBuffer.Count - _receiveBufferOffset);
                     if (receiveCount == 0)
                         break;
@@ -457,9 +457,9 @@ namespace Cowboy.WebSockets
                         payloadCount = 0;
 
                         if (_frameBuilder.TryDecodeFrameHeader(
-                            _receiveBuffer.Array, 
-                            _receiveBuffer.Offset + consumedLength, 
-                            _receiveBufferOffset - consumedLength, 
+                            _receiveBuffer.Array,
+                            _receiveBuffer.Offset + consumedLength,
+                            _receiveBufferOffset - consumedLength,
                             out frameHeader)
                             && frameHeader.Length + frameHeader.PayloadLength <= _receiveBufferOffset - consumedLength)
                         {
@@ -473,9 +473,9 @@ namespace Cowboy.WebSockets
                                 }
 
                                 _frameBuilder.DecodePayload(
-                                    _receiveBuffer.Array, 
-                                    _receiveBuffer.Offset + consumedLength, 
-                                    frameHeader, 
+                                    _receiveBuffer.Array,
+                                    _receiveBuffer.Offset + consumedLength,
+                                    frameHeader,
                                     out payload, out payloadOffset, out payloadCount);
 
                                 switch (frameHeader.OpCode)
@@ -542,7 +542,10 @@ namespace Cowboy.WebSockets
                     catch (ArgumentOutOfRangeException) { }
                 }
             }
-            catch (Exception ex) when (!ShouldThrow(ex)) { }
+            catch (Exception ex)
+            {
+                await HandleReceiveOperationException(ex);
+            }
             finally
             {
                 await Abort();
@@ -559,7 +562,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
             else
@@ -570,7 +573,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
         }
@@ -586,7 +589,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
             else
@@ -597,7 +600,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
         }
@@ -612,7 +615,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
             else
@@ -623,7 +626,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
         }
@@ -754,7 +757,10 @@ namespace Cowboy.WebSockets
                                     "Closing handshake with [{0}] timeout [{1}].", _remoteEndPoint, ConnectTimeout));
                             }
                         }
-                        catch (Exception ex) when (!ShouldThrow(ex)) { }
+                        catch (Exception ex)
+                        {
+                            await HandleSendOperationException(ex);
+                        }
                         return;
                     }
                 case _connecting:
@@ -791,7 +797,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
         }
@@ -886,6 +892,30 @@ namespace Cowboy.WebSockets
 
         #region Exception Handler
 
+        private async Task HandleSendOperationException(Exception ex)
+        {
+            if (IsSocketTimeOut(ex))
+            {
+                await CloseIfShould(ex);
+                throw new WebSocketException(ex.Message, new TimeoutException(ex.Message, ex));
+            }
+
+            await CloseIfShould(ex);
+            throw new WebSocketException(ex.Message, ex);
+        }
+
+        private async Task HandleReceiveOperationException(Exception ex)
+        {
+            if (IsSocketTimeOut(ex))
+            {
+                await CloseIfShould(ex);
+                throw new WebSocketException(ex.Message, new TimeoutException(ex.Message, ex));
+            }
+
+            await CloseIfShould(ex);
+            throw new WebSocketException(ex.Message, ex);
+        }
+
         private bool IsSocketTimeOut(Exception ex)
         {
             return ex is IOException
@@ -894,34 +924,30 @@ namespace Cowboy.WebSockets
                 && (ex.InnerException as SocketException).SocketErrorCode == SocketError.TimedOut;
         }
 
-        private bool ShouldThrow(Exception ex)
+        private async Task<bool> CloseIfShould(Exception ex)
         {
-            if (IsSocketTimeOut(ex))
-            {
-                _log.Error(ex.Message, ex);
-                return false;
-            }
-
             if (ex is ObjectDisposedException
                 || ex is InvalidOperationException
                 || ex is SocketException
                 || ex is IOException
-                || ex is NullReferenceException
+                || ex is NullReferenceException // buffer array operation
+                || ex is ArgumentException      // buffer array operation
                 )
             {
-                if (ex is SocketException)
-                    _log.Error(string.Format("Client [{0}] exception occurred, [{1}].", this, ex.Message), ex);
+                _log.Error(ex.Message, ex);
 
-                return false;
+                await Close(WebSocketCloseCode.AbnormalClosure); // intend to close the session
+
+                return true;
             }
 
-            _log.Error(string.Format("Client [{0}] exception occurred, [{1}].", this, ex.Message), ex);
-            return true;
+            return false;
         }
 
-        private void HandleUserSideError(Exception ex)
+        private async Task HandleUserSideError(Exception ex)
         {
             _log.Error(string.Format("Client [{0}] error occurred in user side [{1}].", this, ex.Message), ex);
+            await Task.CompletedTask;
         }
 
         #endregion
@@ -993,7 +1019,10 @@ namespace Cowboy.WebSockets
                 await _stream.WriteAsync(frame, 0, frame.Length);
                 _keepAliveTracker.OnDataSent();
             }
-            catch (Exception ex) when (!ShouldThrow(ex)) { }
+            catch (Exception ex)
+            {
+                await HandleSendOperationException(ex);
+            }
         }
 
         #endregion

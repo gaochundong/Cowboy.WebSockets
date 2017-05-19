@@ -203,7 +203,7 @@ namespace Cowboy.WebSockets
                 catch (Exception ex)
                 {
                     isErrorOccurredInUserSide = true;
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
 
                 if (!isErrorOccurredInUserSide)
@@ -499,7 +499,10 @@ namespace Cowboy.WebSockets
                     catch (ArgumentOutOfRangeException) { }
                 }
             }
-            catch (Exception ex) when (!ShouldThrow(ex)) { }
+            catch (Exception ex)
+            {
+                await HandleReceiveOperationException(ex);
+            }
             finally
             {
                 await Abort();
@@ -516,7 +519,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
             else
@@ -527,7 +530,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
         }
@@ -543,7 +546,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
             else
@@ -554,7 +557,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
         }
@@ -569,7 +572,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
             else
@@ -580,7 +583,7 @@ namespace Cowboy.WebSockets
                 }
                 catch (Exception ex)
                 {
-                    HandleUserSideError(ex);
+                    await HandleUserSideError(ex);
                 }
             }
         }
@@ -705,7 +708,10 @@ namespace Cowboy.WebSockets
                             _log.DebugFormat("Session [{0}] sends server side close frame [{1}] [{2}].", this, closeCode, closeReason);
 #endif
                         }
-                        catch (Exception ex) when (!ShouldThrow(ex)) { }
+                        catch (Exception ex)
+                        {
+                            await HandleSendOperationException(ex);
+                        }
                         return;
                     }
                 case _connecting:
@@ -741,7 +747,7 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                HandleUserSideError(ex);
+                await HandleUserSideError(ex);
             }
         }
 
@@ -835,6 +841,30 @@ namespace Cowboy.WebSockets
 
         #region Exception Handler
 
+        private async Task HandleSendOperationException(Exception ex)
+        {
+            if (IsSocketTimeOut(ex))
+            {
+                await CloseIfShould(ex);
+                throw new WebSocketException(ex.Message, new TimeoutException(ex.Message, ex));
+            }
+
+            await CloseIfShould(ex);
+            throw new WebSocketException(ex.Message, ex);
+        }
+
+        private async Task HandleReceiveOperationException(Exception ex)
+        {
+            if (IsSocketTimeOut(ex))
+            {
+                await CloseIfShould(ex);
+                throw new WebSocketException(ex.Message, new TimeoutException(ex.Message, ex));
+            }
+
+            await CloseIfShould(ex);
+            throw new WebSocketException(ex.Message, ex);
+        }
+
         private bool IsSocketTimeOut(Exception ex)
         {
             return ex is IOException
@@ -843,34 +873,30 @@ namespace Cowboy.WebSockets
                 && (ex.InnerException as SocketException).SocketErrorCode == SocketError.TimedOut;
         }
 
-        private bool ShouldThrow(Exception ex)
+        private async Task<bool> CloseIfShould(Exception ex)
         {
-            if (IsSocketTimeOut(ex))
-            {
-                _log.Error(ex.Message, ex);
-                return false;
-            }
-
             if (ex is ObjectDisposedException
                 || ex is InvalidOperationException
                 || ex is SocketException
                 || ex is IOException
-                || ex is NullReferenceException
+                || ex is NullReferenceException // buffer array operation
+                || ex is ArgumentException      // buffer array operation
                 )
             {
-                if (ex is SocketException)
-                    _log.Error(string.Format("Session [{0}] exception occurred, [{1}].", this, ex.Message), ex);
+                _log.Error(ex.Message, ex);
 
-                return false;
+                await Close(); // intend to close the session
+
+                return true;
             }
 
-            _log.Error(string.Format("Session [{0}] exception occurred, [{1}].", this, ex.Message), ex);
-            return true;
+            return false;
         }
 
-        private void HandleUserSideError(Exception ex)
+        private async Task HandleUserSideError(Exception ex)
         {
             _log.Error(string.Format("Session [{0}] error occurred in user side [{1}].", this, ex.Message), ex);
+            await Task.CompletedTask;
         }
 
         #endregion
@@ -942,7 +968,10 @@ namespace Cowboy.WebSockets
                 await _stream.WriteAsync(frame, 0, frame.Length);
                 _keepAliveTracker.OnDataSent();
             }
-            catch (Exception ex) when (!ShouldThrow(ex)) { }
+            catch (Exception ex)
+            {
+                await HandleSendOperationException(ex);
+            }
         }
 
         #endregion
