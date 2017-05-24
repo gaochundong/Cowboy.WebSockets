@@ -1015,8 +1015,14 @@ namespace Cowboy.WebSockets
             }
             catch (Exception ex)
             {
-                HandleSendOperationException(ex);
-                throw;
+                try
+                {
+                    HandleSendOperationException(ex);
+                }
+                catch (Exception innnerException)
+                {
+                    _log(innnerException.Message);
+                }
             }
         }
 
