@@ -146,11 +146,11 @@ namespace Cowboy.WebSockets
             int origin = Interlocked.Exchange(ref _state, _connecting);
             if (!(origin == _none || origin == _closed))
             {
-                InternalClose(false);
+                InternalClose(false); // connecting with wrong state
                 throw new InvalidOperationException("This websocket client is in invalid state when connecting.");
             }
 
-            Clean();
+            Clean(); // forcefully clean all things
             ResetKeepAlive();
 
             _tcpClient = _localEndPoint != null ?
@@ -164,7 +164,7 @@ namespace Cowboy.WebSockets
             var ar = _tcpClient.BeginConnect(_remoteEndPoint.Address, _remoteEndPoint.Port, null, _tcpClient);
             if (!ar.AsyncWaitHandle.WaitOne(ConnectTimeout))
             {
-                InternalClose(false);
+                InternalClose(false); // connect timeout
                 throw new TimeoutException(string.Format(
                     "Connect to [{0}] timeout [{1}].", _remoteEndPoint, ConnectTimeout));
             }
@@ -191,7 +191,7 @@ namespace Cowboy.WebSockets
 
                 if (Interlocked.CompareExchange(ref _state, _connected, _connecting) != _connecting)
                 {
-                    InternalClose(false);
+                    InternalClose(false); // connected with wrong state
                     throw new InvalidOperationException("This websocket client is in invalid state when connected.");
                 }
 
@@ -216,20 +216,25 @@ namespace Cowboy.WebSockets
                 }
                 else
                 {
-                    Abort();
+                    InternalClose(true); // user side handle tcp connection error occurred
                 }
             }
             catch (TimeoutException ex)
             {
                 _log(ex.Message);
-                InternalClose(false);
+                InternalClose(false); // timeout exception
                 throw;
             }
             catch (WebSocketException ex)
             {
                 _log(ex.Message);
-                InternalClose(false);
+                InternalClose(false); // websocket exception
                 throw;
+            }
+            catch (Exception ex)
+            {
+                _log(ex.Message);
+                InternalClose(true); // handle tcp connection error occurred
             }
         }
 
@@ -428,15 +433,15 @@ namespace Cowboy.WebSockets
 
         private void HandleDataReceived(IAsyncResult ar)
         {
-            if (this.State != WebSocketState.Open)
+            if (this.State != WebSocketState.Open
+                || _stream == null)
+            {
+                InternalClose(false); // receive buffer callback
                 return;
+            }
 
             try
             {
-                // when callback to here the stream may have been closed
-                if (_stream == null)
-                    return;
-
                 int numberOfReadBytes = 0;
                 try
                 {
@@ -456,8 +461,7 @@ namespace Cowboy.WebSockets
 
                 if (numberOfReadBytes == 0)
                 {
-                    // connection has been closed
-                    Abort();
+                    InternalClose(true); // receive 0-byte means connection has been closed
                     return;
                 }
 
@@ -727,7 +731,7 @@ namespace Cowboy.WebSockets
                             var ar = _stream.BeginWrite(closingHandshake, 0, closingHandshake.Length, null, _stream);
                             if (!ar.AsyncWaitHandle.WaitOne(ConnectTimeout))
                             {
-                                InternalClose(true);
+                                InternalClose(true); // close sending timeout
                                 throw new TimeoutException(string.Format(
                                     "Closing handshake with remote [{0}] timeout [{1}].", RemoteEndPoint, ConnectTimeout));
                             }
@@ -742,7 +746,7 @@ namespace Cowboy.WebSockets
                 case _connecting:
                 case _closing:
                     {
-                        InternalClose(true);
+                        InternalClose(true); // close with state
                         return;
                     }
                 case _closed:
@@ -759,7 +763,7 @@ namespace Cowboy.WebSockets
                 return;
             }
 
-            Clean();
+            Shutdown();
 
             if (shallNotifyUserSide)
             {
@@ -774,6 +778,21 @@ namespace Cowboy.WebSockets
                     HandleUserSideError(ex);
                 }
             }
+
+            Clean();
+        }
+
+        private void Shutdown()
+        {
+            try
+            {
+                // The correct way to shut down the connection (especially if you are in a full-duplex conversation) 
+                // is to call socket.Shutdown(SocketShutdown.Send) and give the remote party some time to close 
+                // their send channel. This ensures that you receive any pending data instead of slamming the 
+                // connection shut. ObjectDisposedException should never be part of the normal application flow.
+                _tcpClient.Client.Shutdown(SocketShutdown.Send);
+            }
+            catch { }
         }
 
         private void Clean()
@@ -839,7 +858,7 @@ namespace Cowboy.WebSockets
 
         public void Abort()
         {
-            InternalClose(true);
+            InternalClose(true); // abort
         }
 
         private void StartClosingTimer()
@@ -859,7 +878,7 @@ namespace Cowboy.WebSockets
             // sending and receiving a Close message, e.g., if it has not received a
             // TCP Close from the server in a reasonable time period.
             _log(string.Format("Closing timer timeout [{0}] then close automatically.", CloseTimeout));
-            InternalClose(true);
+            InternalClose(true); // close timeout
         }
 
         #endregion
@@ -1204,7 +1223,7 @@ namespace Cowboy.WebSockets
             {
                 try
                 {
-                    InternalClose(true);
+                    InternalClose(true); // disposing
                 }
                 catch (Exception ex)
                 {
