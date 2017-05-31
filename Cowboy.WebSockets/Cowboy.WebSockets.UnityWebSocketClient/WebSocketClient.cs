@@ -219,7 +219,6 @@ namespace Cowboy.WebSockets
                     Abort();
                 }
             }
-            catch (ObjectDisposedException) { }
             catch (TimeoutException ex)
             {
                 _log(ex.Message);

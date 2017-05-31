@@ -216,7 +216,6 @@ namespace Cowboy.WebSockets
                     await Abort();
                 }
             }
-            catch (ObjectDisposedException) { }
             catch (Exception ex) when (ex is TimeoutException || ex is WebSocketException)
             {
                 _log.Error(string.Format("Session [{0}] exception occurred, [{1}].", this, ex.Message), ex);
@@ -499,7 +498,6 @@ namespace Cowboy.WebSockets
                     }
                 }
             }
-            catch (ObjectDisposedException) { } // ReadAsync will throw exception when stream disposed during closing
             catch (Exception ex)
             {
                 await HandleReceiveOperationException(ex);
@@ -507,6 +505,7 @@ namespace Cowboy.WebSockets
             finally
             {
                 await Abort();
+                Clean();
             }
         }
 
@@ -735,7 +734,15 @@ namespace Cowboy.WebSockets
                 return;
             }
 
-            Clean();
+            try
+            {
+                // The correct way to shut down the connection (especially if you are in a full-duplex conversation) 
+                // is to call socket.Shutdown(SocketShutdown.Send) and give the remote party some time to close 
+                // their send channel. This ensures that you receive any pending data instead of slamming the 
+                // connection shut. ObjectDisposedException should never be part of the normal application flow.
+                _tcpClient.Client.Shutdown(SocketShutdown.Send);
+            }
+            catch { }
 
             _log.DebugFormat("Session closed for [{0}] on [{1}] in dispatcher [{2}] with session count [{3}].",
                 this.RemoteEndPoint,
@@ -760,6 +767,7 @@ namespace Cowboy.WebSockets
                 {
                     if (_keepAliveTracker != null)
                     {
+                        _keepAliveTracker.StopTimer();
                         _keepAliveTracker.Dispose();
                     }
                 }
@@ -768,6 +776,7 @@ namespace Cowboy.WebSockets
                 {
                     if (_keepAliveTimeoutTimer != null)
                     {
+                        _keepAliveTimeoutTimer.Change(Timeout.Infinite, Timeout.Infinite);
                         _keepAliveTimeoutTimer.Dispose();
                     }
                 }
@@ -776,6 +785,7 @@ namespace Cowboy.WebSockets
                 {
                     if (_closingTimeoutTimer != null)
                     {
+                        _closingTimeoutTimer.Change(Timeout.Infinite, Timeout.Infinite);
                         _closingTimeoutTimer.Dispose();
                     }
                 }
@@ -981,20 +991,12 @@ namespace Cowboy.WebSockets
 
         private void StartKeepAliveTimeoutTimer()
         {
-            try
-            {
-                _keepAliveTimeoutTimer.Change((int)KeepAliveTimeout.TotalMilliseconds, Timeout.Infinite);
-            }
-            catch (ObjectDisposedException) { }
+            _keepAliveTimeoutTimer.Change((int)KeepAliveTimeout.TotalMilliseconds, Timeout.Infinite);
         }
 
         private void StopKeepAliveTimeoutTimer()
         {
-            try
-            {
-                _keepAliveTimeoutTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            }
-            catch (ObjectDisposedException) { }
+            _keepAliveTimeoutTimer.Change(Timeout.Infinite, Timeout.Infinite);
         }
 
         private async void OnKeepAliveTimeout()

@@ -8,10 +8,11 @@ namespace Cowboy.WebSockets
     {
         public abstract void OnDataReceived();
         public abstract void OnDataSent();
-        public abstract void Dispose();
         public abstract void StartTimer();
+        public abstract void StopTimer();
         public abstract void ResetTimer();
         public abstract bool ShouldSendKeepAlive();
+        public abstract void Dispose();
 
         public static KeepAliveTracker Create(TimeSpan keepAliveInterval, TimerCallback keepAliveCallback)
         {
@@ -33,11 +34,15 @@ namespace Cowboy.WebSockets
             {
             }
 
-            public override void ResetTimer()
+            public override void StartTimer()
             {
             }
 
-            public override void StartTimer()
+            public override void StopTimer()
+            {
+            }
+
+            public override void ResetTimer()
             {
             }
 
@@ -77,11 +82,6 @@ namespace Cowboy.WebSockets
                 _lastSendActivity.Restart();
             }
 
-            public override void ResetTimer()
-            {
-                ResetTimer((int)_keepAliveInterval.TotalMilliseconds);
-            }
-
             public override void StartTimer()
             {
                 int keepAliveIntervalMilliseconds = (int)_keepAliveInterval.TotalMilliseconds;
@@ -99,6 +99,19 @@ namespace Cowboy.WebSockets
                         _keepAliveTimer.Change(keepAliveIntervalMilliseconds, Timeout.Infinite);
                     }
                 }
+            }
+
+            public override void StopTimer()
+            {
+                if (_keepAliveTimer != null)
+                {
+                    _keepAliveTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                }
+            }
+
+            public override void ResetTimer()
+            {
+                ResetTimer((int)_keepAliveInterval.TotalMilliseconds);
             }
 
             public override bool ShouldSendKeepAlive()
@@ -123,7 +136,10 @@ namespace Cowboy.WebSockets
 
             private void ResetTimer(int dueInMilliseconds)
             {
-                _keepAliveTimer.Change(dueInMilliseconds, Timeout.Infinite);
+                if (_keepAliveTimer != null)
+                {
+                    _keepAliveTimer.Change(dueInMilliseconds, Timeout.Infinite);
+                }
             }
 
             private TimeSpan GetIdleTime()

@@ -8,10 +8,11 @@ namespace Cowboy.WebSockets
     {
         public abstract void OnDataReceived();
         public abstract void OnDataSent();
-        public abstract void Dispose();
         public abstract void StartTimer();
+        public abstract void StopTimer();
         public abstract void ResetTimer();
         public abstract bool ShouldSendKeepAlive();
+        public abstract void Dispose();
 
         public static KeepAliveTracker Create(TimeSpan keepAliveInterval, TimerCallback keepAliveCallback)
         {
@@ -33,11 +34,15 @@ namespace Cowboy.WebSockets
             {
             }
 
-            public override void ResetTimer()
+            public override void StartTimer()
             {
             }
 
-            public override void StartTimer()
+            public override void StopTimer()
+            {
+            }
+
+            public override void ResetTimer()
             {
             }
 
@@ -75,13 +80,8 @@ namespace Cowboy.WebSockets
 
             public override void OnDataSent()
             {
-                _lastReceiveActivity.Stop();
-                _lastReceiveActivity.Start();
-            }
-
-            public override void ResetTimer()
-            {
-                ResetTimer((int)_keepAliveInterval.TotalMilliseconds);
+                _lastSendActivity.Stop();
+                _lastSendActivity.Start();
             }
 
             public override void StartTimer()
@@ -103,6 +103,19 @@ namespace Cowboy.WebSockets
                 }
             }
 
+            public override void StopTimer()
+            {
+                if (_keepAliveTimer != null)
+                {
+                    _keepAliveTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                }
+            }
+
+            public override void ResetTimer()
+            {
+                ResetTimer((int)_keepAliveInterval.TotalMilliseconds);
+            }
+
             public override bool ShouldSendKeepAlive()
             {
                 TimeSpan idleTime = GetIdleTime();
@@ -117,12 +130,18 @@ namespace Cowboy.WebSockets
 
             public override void Dispose()
             {
-                _keepAliveTimer.Dispose();
+                if (_keepAliveTimer != null)
+                {
+                    _keepAliveTimer.Dispose();
+                }
             }
 
             private void ResetTimer(int dueInMilliseconds)
             {
-                _keepAliveTimer.Change(dueInMilliseconds, Timeout.Infinite);
+                if (_keepAliveTimer != null)
+                {
+                    _keepAliveTimer.Change(dueInMilliseconds, Timeout.Infinite);
+                }
             }
 
             private TimeSpan GetIdleTime()
