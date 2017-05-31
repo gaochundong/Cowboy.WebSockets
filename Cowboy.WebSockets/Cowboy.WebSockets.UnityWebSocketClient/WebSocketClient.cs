@@ -571,7 +571,10 @@ namespace Cowboy.WebSockets
                 }
             }
 
-            SegmentBufferDeflector.ShiftBuffer(_configuration.BufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
+            if (_receiveBuffer != null && _receiveBuffer.Array != null)
+            {
+                SegmentBufferDeflector.ShiftBuffer(_configuration.BufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
+            }
         }
 
         private void HandleContinuationFrame(Header frameHeader, byte[] payload, int payloadOffset, int payloadCount)
