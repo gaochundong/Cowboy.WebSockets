@@ -359,14 +359,15 @@ namespace Cowboy.WebSockets
                     ref _receiveBuffer,
                     ref _receiveBufferOffset);
             }
-            catch (ArgumentOutOfRangeException)
-            {
-                handshakeResult = false;
-            }
             catch (WebSocketHandshakeException ex)
             {
                 _log.Error(string.Format("Session [{0}] exception occurred, [{1}].", this, ex.Message), ex);
                 handshakeResult = false;
+            }
+            catch (Exception)
+            {
+                handshakeResult = false;
+                throw;
             }
 
             return handshakeResult;
@@ -492,11 +493,10 @@ namespace Cowboy.WebSockets
                         }
                     }
 
-                    try
+                    if (_receiveBuffer != null && _receiveBuffer.Array != null)
                     {
                         SegmentBufferDeflector.ShiftBuffer(_bufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
                     }
-                    catch (ArgumentOutOfRangeException) { }
                 }
             }
             catch (Exception ex)

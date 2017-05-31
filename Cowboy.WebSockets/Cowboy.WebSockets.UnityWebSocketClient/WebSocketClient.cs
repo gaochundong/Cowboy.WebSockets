@@ -381,14 +381,15 @@ namespace Cowboy.WebSockets
                     ref _receiveBuffer,
                     ref _receiveBufferOffset);
             }
-            catch (ArgumentOutOfRangeException)
-            {
-                handshakeResult = false;
-            }
             catch (WebSocketHandshakeException ex)
             {
                 _log(ex.Message);
                 handshakeResult = false;
+            }
+            catch (Exception)
+            {
+                handshakeResult = false;
+                throw;
             }
 
             return handshakeResult;
@@ -570,11 +571,7 @@ namespace Cowboy.WebSockets
                 }
             }
 
-            try
-            {
-                SegmentBufferDeflector.ShiftBuffer(_configuration.BufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
-            }
-            catch (ArgumentOutOfRangeException) { }
+            SegmentBufferDeflector.ShiftBuffer(_configuration.BufferManager, consumedLength, ref _receiveBuffer, ref _receiveBufferOffset);
         }
 
         private void HandleContinuationFrame(Header frameHeader, byte[] payload, int payloadOffset, int payloadCount)
