@@ -197,7 +197,7 @@ namespace Cowboy.WebSockets
 
             try
             {
-                Clean();
+                Clean(); // forcefully clean all things
                 ResetKeepAlive();
 
                 _tcpClient = new TcpClient(_remoteEndPoint.Address.AddressFamily);
@@ -271,7 +271,7 @@ namespace Cowboy.WebSockets
                 }
                 else
                 {
-                    await Abort();
+                    await InternalClose(true); // user side handle tcp connection error occurred
                 }
             }
             catch (Exception ex)
@@ -542,14 +542,17 @@ namespace Cowboy.WebSockets
                     }
                 }
             }
+            catch (ObjectDisposedException)
+            {
+                // looking forward to a graceful quit from the ReadAsync, but the EndRead doesn't make it happed.
+            }
             catch (Exception ex)
             {
                 await HandleReceiveOperationException(ex);
             }
             finally
             {
-                await Abort();
-                Clean();
+                await InternalClose(true); // read async buffer returned, remote notifies closed
             }
         }
 
@@ -784,15 +787,7 @@ namespace Cowboy.WebSockets
                 return;
             }
 
-            try
-            {
-                // The correct way to shut down the connection (especially if you are in a full-duplex conversation) 
-                // is to call socket.Shutdown(SocketShutdown.Send) and give the remote party some time to close 
-                // their send channel. This ensures that you receive any pending data instead of slamming the 
-                // connection shut. ObjectDisposedException should never be part of the normal application flow.
-                _tcpClient.Client.Shutdown(SocketShutdown.Send);
-            }
-            catch { }
+            Shutdown();
 
             if (shallNotifyUserSide)
             {
@@ -809,6 +804,21 @@ namespace Cowboy.WebSockets
                     await HandleUserSideError(ex);
                 }
             }
+
+            Clean();
+        }
+
+        private void Shutdown()
+        {
+            try
+            {
+                // The correct way to shut down the connection (especially if you are in a full-duplex conversation) 
+                // is to call socket.Shutdown(SocketShutdown.Send) and give the remote party some time to close 
+                // their send channel. This ensures that you receive any pending data instead of slamming the 
+                // connection shut. ObjectDisposedException should never be part of the normal application flow.
+                _tcpClient.Client.Shutdown(SocketShutdown.Send);
+            }
+            catch { }
         }
 
         private void Clean()
@@ -1261,7 +1271,7 @@ namespace Cowboy.WebSockets
             {
                 try
                 {
-                    Abort().Wait();
+                    InternalClose(false).Wait(); // disposing
                 }
                 catch (Exception ex)
                 {

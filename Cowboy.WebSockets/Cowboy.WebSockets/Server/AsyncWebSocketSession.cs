@@ -186,7 +186,7 @@ namespace Cowboy.WebSockets
 
                 if (Interlocked.CompareExchange(ref _state, _connected, _connecting) != _connecting)
                 {
-                    await Abort();
+                    await InternalClose(false); // connected with wrong state
                     throw new ObjectDisposedException("This websocket session has been disposed after connected.");
                 }
 
@@ -213,13 +213,13 @@ namespace Cowboy.WebSockets
                 }
                 else
                 {
-                    await Abort();
+                    await InternalClose(true); // user side handle tcp connection error occurred
                 }
             }
             catch (Exception ex) when (ex is TimeoutException || ex is WebSocketException)
             {
                 _log.Error(string.Format("Session [{0}] exception occurred, [{1}].", this, ex.Message), ex);
-                await Abort();
+                await InternalClose(true); // handle tcp connection error occurred
                 throw;
             }
         }
@@ -498,14 +498,17 @@ namespace Cowboy.WebSockets
                     }
                 }
             }
+            catch (ObjectDisposedException)
+            {
+                // looking forward to a graceful quit from the ReadAsync, but the EndRead doesn't make it happed.
+            }
             catch (Exception ex)
             {
                 await HandleReceiveOperationException(ex);
             }
             finally
             {
-                await Abort();
-                Clean();
+                await InternalClose(true); // read async buffer returned, remote notifies closed
             }
         }
 
@@ -717,7 +720,7 @@ namespace Cowboy.WebSockets
                 case _connecting:
                 case _closing:
                     {
-                        await Close();
+                        await InternalClose(true); // closing
                         return;
                     }
                 case _disposed:
@@ -727,13 +730,37 @@ namespace Cowboy.WebSockets
             }
         }
 
-        private async Task Close()
+        private async Task InternalClose(bool shallNotifyUserSide)
         {
             if (Interlocked.Exchange(ref _state, _disposed) == _disposed)
             {
                 return;
             }
 
+            Shutdown();
+
+            if (shallNotifyUserSide)
+            {
+                _log.DebugFormat("Session closed for [{0}] on [{1}] in dispatcher [{2}] with session count [{3}].",
+                    this.RemoteEndPoint,
+                    DateTime.UtcNow.ToString(@"yyyy-MM-dd HH:mm:ss.fffffff"),
+                    _module.GetType().Name,
+                    this.Server.SessionCount - 1);
+                try
+                {
+                    await _module.OnSessionClosed(this);
+                }
+                catch (Exception ex)
+                {
+                    await HandleUserSideError(ex);
+                }
+            }
+
+            Clean();
+        }
+
+        private void Shutdown()
+        {
             try
             {
                 // The correct way to shut down the connection (especially if you are in a full-duplex conversation) 
@@ -743,20 +770,6 @@ namespace Cowboy.WebSockets
                 _tcpClient.Client.Shutdown(SocketShutdown.Send);
             }
             catch { }
-
-            _log.DebugFormat("Session closed for [{0}] on [{1}] in dispatcher [{2}] with session count [{3}].",
-                this.RemoteEndPoint,
-                DateTime.UtcNow.ToString(@"yyyy-MM-dd HH:mm:ss.fffffff"),
-                _module.GetType().Name,
-                this.Server.SessionCount - 1);
-            try
-            {
-                await _module.OnSessionClosed(this);
-            }
-            catch (Exception ex)
-            {
-                await HandleUserSideError(ex);
-            }
         }
 
         private void Clean()
@@ -825,7 +838,7 @@ namespace Cowboy.WebSockets
 
         public async Task Abort()
         {
-            await Close();
+            await InternalClose(true); // abort
         }
 
         private void StartClosingTimer()
@@ -845,7 +858,7 @@ namespace Cowboy.WebSockets
             // sending and receiving a Close message, e.g., if it has not received a
             // TCP Close from the server in a reasonable time period.
             _log.WarnFormat("Session [{0}] closing timer timeout [{1}] then close automatically.", this, CloseTimeout);
-            await Close();
+            await InternalClose(true); // close timeout
         }
 
         #endregion
@@ -896,7 +909,7 @@ namespace Cowboy.WebSockets
             {
                 _log.Error(ex.Message, ex);
 
-                await Close(); // intend to close the session
+                await InternalClose(true); // catch specified exception then intend to close the session
 
                 return true;
             }
@@ -1148,7 +1161,7 @@ namespace Cowboy.WebSockets
             {
                 try
                 {
-                    Close().Wait();
+                    InternalClose(false).Wait(); // disposing
                 }
                 catch (Exception ex)
                 {
