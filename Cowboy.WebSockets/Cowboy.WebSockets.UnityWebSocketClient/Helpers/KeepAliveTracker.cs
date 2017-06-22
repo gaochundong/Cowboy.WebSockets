@@ -75,12 +75,14 @@ namespace Cowboy.WebSockets
             public override void OnDataReceived()
             {
                 _lastReceiveActivity.Stop();
+                _lastReceiveActivity.Reset();
                 _lastReceiveActivity.Start();
             }
 
             public override void OnDataSent()
             {
                 _lastSendActivity.Stop();
+                _lastSendActivity.Reset();
                 _lastSendActivity.Start();
             }
 
